@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/zzf-857/quickerconfigswitch/internal/agent"
+	"github.com/zzf-857/quickerconfigswitch/internal/core"
 	"github.com/zzf-857/quickerconfigswitch/internal/provider"
 	"github.com/zzf-857/quickerconfigswitch/internal/safekeep"
 )
@@ -117,7 +118,7 @@ func (e *env) cmdUse(args []string, diffOnly bool) error {
 	if p.Empty() || strings.TrimSpace(diff) == "" {
 		fmt.Fprintln(e.out, "没有需要修改的内容。")
 	} else {
-		fmt.Fprintln(e.out, diff)
+		fmt.Fprintln(e.out, core.Redact(diff))
 	}
 	if *dry || diffOnly {
 		return nil
@@ -166,7 +167,7 @@ func (e *env) restore(a agent.Agent, yes, dry bool) error {
 	if strings.TrimSpace(diff) == "" {
 		fmt.Fprintln(e.out, "没有需要修改的内容。")
 	} else {
-		fmt.Fprintln(e.out, diff)
+		fmt.Fprintln(e.out, core.Redact(diff))
 	}
 	if dry {
 		return nil

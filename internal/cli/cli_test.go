@@ -47,6 +47,8 @@ func setup(t *testing.T) (codexDir, claudeDir string) {
 	return
 }
 
+const cpaKey = "sk-supersecretkey-1234567890"
+
 func addCPA(t *testing.T) {
 	mustRun(t, "", "provider", "add", "cpa", "--template", "cpa", "--key", "sk-supersecretkey-1234567890", "--header", "X-A=b")
 	mustRun(t, "", "provider", "models", "cpa", "--add", "gpt-5.5,claude-sonnet")
@@ -97,6 +99,9 @@ func TestUseCodexAndRestore(t *testing.T) {
 	out := mustRun(t, "", "use", "codex", "cpa/gpt-5.5", "--fast", "--dry-run")
 	if !strings.Contains(out, "qcs-cpa") {
 		t.Fatalf("diff: %s", out)
+	}
+	if strings.Contains(out, cpaKey) || !strings.Contains(out, "experimental_bearer_token") {
+		t.Fatalf("diff must show the key masked:\n%s", out)
 	}
 	if b, _ := os.ReadFile(cfg); string(b) != codexCfg {
 		t.Fatal("dry-run wrote")

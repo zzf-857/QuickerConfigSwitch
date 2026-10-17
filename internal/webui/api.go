@@ -132,15 +132,7 @@ type providerView struct {
 
 // secretHeader: a header whose value is a credential and is masked like
 // the key.
-func secretHeader(name string) bool {
-	n := strings.ToLower(name)
-	for _, w := range []string{"auth", "key", "token", "secret", "cookie", "password"} {
-		if strings.Contains(n, w) {
-			return true
-		}
-	}
-	return false
-}
+func secretHeader(name string) bool { return core.SecretHeader(name) }
 
 func maskProvider(p provider.Provider) providerView {
 	v := providerView{Provider: p, HasKey: p.APIKey != ""}

@@ -114,7 +114,7 @@ func (e *env) profileApply(args []string) error {
 		case s.Preview.Nothing || strings.TrimSpace(s.Preview.Diff) == "":
 			fmt.Fprintln(e.out, "没有需要修改的内容。")
 		default:
-			fmt.Fprintln(e.out, s.Preview.Diff)
+			fmt.Fprintln(e.out, core.Redact(s.Preview.Diff))
 		}
 	}
 	if *dry {

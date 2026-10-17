@@ -47,6 +47,7 @@ function failBanner(e) {
 function selectTab(id, focus) {
   app.tab = id;
   try { localStorage.setItem('qcs.tab', id); } catch { /* storage off */ }
+  if (location.hash !== `#${id}`) history.replaceState(null, '', `${location.pathname}${location.search}#${id}`);
   for (const tb of TABS) {
     const b = tabButtons[tb.id];
     const on = tb.id === id;
@@ -80,6 +81,8 @@ function init() {
     const saved = localStorage.getItem('qcs.tab');
     if (TABS.some((x) => x.id === saved)) app.tab = saved;
   } catch { /* storage off */ }
+  const fromHash = location.hash.slice(1);
+  if (TABS.some((x) => x.id === fromHash)) app.tab = fromHash;
 
   const bar = h('div', { class: 'tabs', role: 'tablist', 'aria-label': t('appTitle') });
   TABS.forEach((tb, i) => {

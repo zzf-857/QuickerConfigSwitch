@@ -224,3 +224,21 @@ export function profileSummary(profile) {
 export function stepsFailed(steps) {
   return (steps || []).some((s) => s.error);
 }
+
+/** slotLabel drops a slot's kind prefix: "toml-top:model" → "model". */
+export function slotLabel(slot) {
+  return String(slot).replace(/^[a-z][a-z-]*:/, '');
+}
+
+/** shortPath keeps a path's last two parts: ".codex/config.toml". */
+export function shortPath(path) {
+  const parts = String(path || '').split(/[\\/]/).filter(Boolean);
+  return parts.slice(-2).join('/');
+}
+
+/** freeID is id, or id-2, id-3, … when taken by one of the providers. */
+export function freeID(id, providers) {
+  const taken = new Set((providers || []).map((p) => p.id));
+  if (!taken.has(id)) return id;
+  for (let i = 2; ; i++) if (!taken.has(`${id}-${i}`)) return `${id}-${i}`;
+}

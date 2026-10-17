@@ -1,6 +1,6 @@
 // Small DOM helpers: element builder, toasts, modals, the diff view.
 import { t } from './i18n.js';
-import { diffLines, reportLines } from './logic.js';
+import { diffLines, reportLines, slotLabel, shortPath } from './logic.js';
 
 /** h builds an element: h('div', {class: 'x', onclick: f}, child, 'text', [more]). */
 export function h(tag, attrs, ...children) {
@@ -17,7 +17,15 @@ export function h(tag, attrs, ...children) {
   return el;
 }
 
-function append(el, children) {
+/** fill replaces el's children (nulls skipped). */
+export function fill(el, ...children) {
+  el.replaceChildren();
+  append(el, children);
+  return el;
+}
+
+/** append adds children to el, skipping null/false and flattening arrays. */
+export function append(el, children) {
   for (const c of children) {
     if (c === undefined || c === null || c === false) continue;
     if (Array.isArray(c)) append(el, c);
@@ -116,9 +124,9 @@ export function reportView(report) {
   const lines = reportLines(report);
   if (!lines.length) return null;
   return h('ul', { class: 'report' }, lines.map((f) => h('li', {},
-    h('code', { class: 'path' }, f.path),
-    h('span', { class: 'report-items' }, f.items.map((it) => h('span', { class: `chip chip-${it.kind === 'left' ? 'warn' : 'muted'}` },
-      t(`report_${it.kind}`), it.slots.length ? `：${it.slots.join(', ')}` : ''))))));
+    h('code', { class: 'path', title: f.path }, shortPath(f.path)),
+    h('span', { class: 'report-items' }, f.items.map((it) => h('span', { class: `tag tag-${it.kind === 'left' ? 'warn' : 'muted'}` },
+      t(`report_${it.kind}`), it.slots.length ? `：${it.slots.map(slotLabel).join(', ')}` : ''))))));
 }
 
 /**

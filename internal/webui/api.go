@@ -67,7 +67,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeErr(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, errorBody{Error: scrubKeys(msg)})
+	writeJSON(w, status, errorBody{Error: maskText(scrubKeys(msg))})
 }
 
 // fail writes err with a status picked from what it says.
@@ -231,7 +231,7 @@ func (s *server) preview(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, pv)
+	writeJSON(w, http.StatusOK, maskPreview(pv))
 }
 
 func (s *server) use(w http.ResponseWriter, r *http.Request) {
@@ -245,6 +245,7 @@ func (s *server) use(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	res.Notice = maskText(res.Notice)
 	s.withState(w, map[string]any{"result": res})
 }
 
@@ -451,7 +452,7 @@ func (s *server) previewProfile(w http.ResponseWriter, r *http.Request) {
 	if steps == nil {
 		steps = []core.ProfileStep{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"steps": steps})
+	writeJSON(w, http.StatusOK, map[string]any{"steps": maskSteps(steps)})
 }
 
 func (s *server) applyProfile(w http.ResponseWriter, r *http.Request) {
@@ -463,7 +464,7 @@ func (s *server) applyProfile(w http.ResponseWriter, r *http.Request) {
 	if steps == nil {
 		steps = []core.ProfileStep{}
 	}
-	s.withState(w, map[string]any{"steps": steps})
+	s.withState(w, map[string]any{"steps": maskSteps(steps)})
 }
 
 // ---- import ----

@@ -5,12 +5,14 @@ import { h, toast } from './ui.js';
 import { renderAgents } from './agents.js';
 import { renderProviders } from './providers.js';
 import { renderProfiles } from './profiles.js';
+import { renderSettings } from './settings.js';
 import { deferRefresh, relayPolicy } from './logic.js';
 
 const TABS = [
   { id: 'agents', label: 'tabAgents', render: renderAgents },
   { id: 'providers', label: 'tabProviders', render: renderProviders },
   { id: 'profiles', label: 'tabProfiles', render: renderProfiles },
+  { id: 'settings', label: 'tabSettings', render: renderSettings },
 ];
 
 export const app = {

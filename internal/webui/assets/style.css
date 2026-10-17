@@ -109,7 +109,7 @@ input:focus-visible, select:focus-visible { outline: none; border-color: var(--a
   width: 24px; height: 24px; border-radius: 7px;
   background: var(--accent); color: var(--accent-text); font-size: 13px; font-weight: 700;
 }
-.tabs { display: flex; gap: 2px; height: 100%; }
+.tabs { display: flex; gap: 2px; height: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden; }
 .tab {
   appearance: none; border: 0; background: none; color: var(--muted);
   font: inherit; font-weight: 550; padding: 0 12px; cursor: pointer;
@@ -262,6 +262,8 @@ fieldset[disabled] .seg-group label { cursor: default; }
 .notice-text { color: var(--text); margin-top: 4px; white-space: pre-wrap; }
 .notice code { font-size: 12px; }
 .relay-status { display: flex; flex-direction: column; gap: 6px; overflow-wrap: anywhere; }
+.settings-card { max-width: 680px; }
+.settings-paths dd { overflow-wrap: anywhere; }
 
 .problems { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .problem { padding: 6px 10px; border-radius: var(--radius-sm); background: var(--surface-2); }

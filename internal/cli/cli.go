@@ -34,6 +34,7 @@ const usageText = `qcs - 在官方配置与自定义 provider 之间快速切换
   qcs use codex <provider>/<model> --relay [--relay-all] [--port N] [--yes] [--dry-run]
                                            前台路由，停止后还原配置
   qcs relay recover                        异常退出后还原路由配置
+  qcs autostart [status|enable|disable]      查询或设置当前用户的登录自启
   qcs use <agent> official                 切回官方 (同 restore)
   qcs diff <agent> <provider>/<model>|official   只看变更
   qcs restore <agent> [--yes] [--dry-run]  还原
@@ -103,6 +104,8 @@ func (e *env) dispatch(args []string) error {
 		return e.cmdWeb(rest)
 	case "relay":
 		return e.cmdRelay(rest)
+	case "autostart":
+		return e.cmdAutostart(rest)
 	case "profile":
 		return e.cmdProfile(rest)
 	case "import":

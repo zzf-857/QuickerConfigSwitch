@@ -33,3 +33,20 @@ test('an expired or unavailable relay preview surfaces the server error', async 
   }));
   await assert.rejects(api.startRelay('expired'), (error) => error instanceof APIError && error.status === 409 && error.message === 'relay preview expired');
 });
+
+test('autostart inspection is read-only and writes an explicit boolean on selection', async (ctx) => {
+  const calls = [];
+  ctx.mock.method(globalThis, 'fetch', async (path, options) => {
+    calls.push({ path, ...options });
+    return { ok: true, json: async () => ({ supported: true, enabled: false }) };
+  });
+  await api.autostart();
+  await api.setAutostart(true);
+  await api.setAutostart(false);
+  assert.deepEqual(calls.map((c) => [c.path, c.method, c.body]), [
+    ['/api/autostart', 'GET', undefined],
+    ['/api/autostart', 'PUT', '{"enabled":true}'],
+    ['/api/autostart', 'PUT', '{"enabled":false}'],
+  ]);
+  for (const call of calls) assert.equal(call.credentials, 'same-origin');
+});

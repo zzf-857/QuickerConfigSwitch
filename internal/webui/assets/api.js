@@ -31,6 +31,8 @@ const enc = encodeURIComponent;
 
 export const api = {
   state: () => call('GET', '/api/state'),
+  autostart: () => call('GET', '/api/autostart'),
+  setAutostart: (enabled) => call('PUT', '/api/autostart', { enabled }),
   preview: (req) => call('POST', '/api/preview', req),
   use: (req) => call('POST', '/api/use', req),
   previewRelay: (req) => call('POST', '/api/relay/preview', req),

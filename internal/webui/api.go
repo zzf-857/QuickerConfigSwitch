@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/zzf-857/quickerconfigswitch/internal/agent"
+	"github.com/zzf-857/quickerconfigswitch/internal/autostart"
 	"github.com/zzf-857/quickerconfigswitch/internal/core"
 	"github.com/zzf-857/quickerconfigswitch/internal/importer"
 	"github.com/zzf-857/quickerconfigswitch/internal/provider"
@@ -26,6 +27,8 @@ func (s *server) routes(m *http.ServeMux) {
 	m.HandleFunc("POST /api/relay/cancel", s.locked(s.cancelRelay))
 	m.HandleFunc("POST /api/relay/stop", s.locked(s.stopRelay))
 	m.HandleFunc("POST /api/relay/recover", s.locked(s.recoverRelay))
+	m.HandleFunc("GET /api/autostart", s.getAutostart)
+	m.HandleFunc("PUT /api/autostart", s.locked(s.setAutostart))
 
 	m.HandleFunc("GET /api/templates", s.templates)
 	m.HandleFunc("POST /api/providers", s.locked(s.addProvider))
@@ -176,6 +179,7 @@ type state struct {
 	Profiles  []core.Profile   `json:"profiles"`
 	Version   string           `json:"version"`
 	Relay     core.RelayStatus `json:"relay"`
+	Autostart autostart.Status `json:"autostart"`
 }
 
 func (s *server) state() (state, error) {
@@ -184,6 +188,13 @@ func (s *server) state() (state, error) {
 	if s.o.Relay != nil {
 		st.Relay = s.o.Relay.Status()
 		st.Relay.Error = maskText(st.Relay.Error)
+	}
+	if s.o.Autostart != nil {
+		var err error
+		st.Autostart, err = s.o.Autostart.Status()
+		if err != nil {
+			st.Autostart.Problem = maskText(err.Error())
+		}
 	}
 	if st.Agents == nil {
 		st.Agents = []core.AgentView{}

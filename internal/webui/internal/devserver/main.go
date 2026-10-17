@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/zzf-857/quickerconfigswitch/internal/autostart"
 	"github.com/zzf-857/quickerconfigswitch/internal/core"
 	"github.com/zzf-857/quickerconfigswitch/internal/provider"
 	"github.com/zzf-857/quickerconfigswitch/internal/testenv"
@@ -79,7 +80,13 @@ func run() error {
 	}
 	control := core.NewRelayController()
 	defer control.Close()
-	srv := &http.Server{Addr: *addr, Handler: webui.Handler(webui.Options{Token: *token, Version: "dev", Relay: control}), ReadHeaderTimeout: 5 * time.Second}
+	// This fixture server is headless and its temporary paths disappear
+	// on exit, so it must never register itself to run at login.
+	login, err := autostart.New(false)
+	if err != nil {
+		return err
+	}
+	srv := &http.Server{Addr: *addr, Handler: webui.Handler(webui.Options{Token: *token, Version: "dev", Relay: control, Autostart: login}), ReadHeaderTimeout: 5 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go func() {

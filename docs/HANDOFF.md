@@ -5,7 +5,7 @@
 
 ## 1. 一句话现状
 
-CLI 核心、图形界面、方案和导入已完成；模式 R 现支持 **CLI、GUI/Web 和托盘生命周期管理**。接下来的阶段是可选择的开机自启。切回官方后的 provider 密钥残留已修复。具体阶段与验证见 [STAGES.md](STAGES.md)。真实用户机器上的验收仍未完成，不能把本地假后端测试视为真实 Codex/CPA 验收。
+CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、GUI/Web 和托盘生命周期管理**，并复用了 Magpie 的可选登录自启实现。后续按阶段继续核对并提取上游成熟逻辑，具体状态与验证见 [STAGES.md](STAGES.md)，复用映射见 [UPSTREAM.md](UPSTREAM.md)。真实用户机器上的验收仍未完成，不能把本地假后端测试视为真实 Codex/CPA 验收。
 
 ## 2. 已完成的功能
 
@@ -26,6 +26,7 @@ CLI 核心、图形界面、方案和导入已完成；模式 R 现支持 **CLI�
 | 官方与第三方并存 / 全走第三方的前台路由 | `qcs use codex cpa/gpt-5.5 --relay [--relay-all]` | 本地假后端、SSE、压缩请求、凭据隔离 |
 | 路由退出还原、异常重启、手动恢复、端口占用回退 | `qcs relay recover` / 再次运行 `--relay` | 生命周期及进程信号测试 |
 | GUI/Web 路由预览、确认、停止、恢复和所有者状态；托盘停止/恢复 | Codex 卡片「本地路由」 / 托盘菜单 | 控制器/API race、Web SIGTERM、真实后端 Chromium、GTK 编译与原生窗口启动 |
+| 当前用户登录自启（复用 Magpie 平台实现） | 设置页 / `qcs autostart status\|enable\|disable` | 临时 HOME、模拟注册表、CLI/API/前端测试；真实登录待验收 |
 
 ## 3. 构建与测试
 
@@ -45,7 +46,7 @@ make cli
 
 - Go 1.26（go.mod 要求；旧 Go 会自动下载工具链）。
 - Linux 编 GUI 需要 `libgtk-3-dev libwebkit2gtk-4.1-dev`；不带 `gtk3`/`nogui` 标签会去找 GTK4 而失败。
-- macOS / Windows 的 GUI 需要在本机原生编译（CGO）；只验证过 `nogui` 交叉编译和 Windows 的 GUI 编译。
+- macOS GUI 需要本机工具链和系统框架；Windows GUI 已验证纯 Go 交叉编译。交叉编译不代表原生运行或登录自启验收。
 - 所有测试通过 `internal/testenv` 把 HOME 等指向临时目录，**不会碰真实配置**。新增测试包必须加 `func TestMain(m *testing.M) { testenv.Main(m) }`。
 - 界面开发服务器：`go run ./internal/webui/internal/devserver -addr 127.0.0.1:8765 -token dev [-switched]`（用临时 home 和假数据）。
 - 当前云环境的完整 Go 依赖已缓存并通过 `go mod verify`。SQLite/libc 首次下载受网络重定向限制，已从官方 GitLab 源码生成与 `go.sum` 完全一致的模块归档；辅助工具及归档在 `/workspace/.qcs-tools`。复建若再次下载受阻，需要环境允许 `storage.googleapis.com`。
@@ -59,6 +60,7 @@ make cli
 - Windows amd64、macOS arm64 的 `nogui` 交叉编译通过；这不代表原生 GUI 或真机运行验收。
 - Web fixture HTTP 冒烟通过：页面、授权状态查询、未授权 401、切换预览。Unix 子进程测试验证 SIGTERM、SIGKILL、重启恢复和登录文件不变。
 - 阶段 B：新增控制器/鉴权 API/进程级检查，前端现在 15 项测试；真实后端 Chromium 验证全部预览关闭路径、单次确认、网络失败释放、停止还原、方案守护和编辑保护。GTK3 原生窗口在 Xvfb 下启动；实际托盘宿主与真实账号仍待验收。
+- 阶段 C：GTK3 全量 race/vet/桌面构建通过，前端 18 项；当前用户自启的 CLI/API 与浏览器流程仅在临时 HOME 中测试，Windows 使用假注册表。系统 GLib 验证转义与参数，Windows GUI/macOS CLI 交叉编译通过。真实登录与系统策略待验收。
 
 ## 4. 代码地图
 
@@ -71,6 +73,7 @@ internal/core           GUI、web、CLI 共用的门面：Agents/PreviewUse/Use/
 internal/relay          Codex 官方 / 第三方 HTTP 路由、模型目录合并、SSE、压缩请求
 internal/webui          JSON API + 内嵌页面（assets/ 下原生 JS，无构建步骤）
 internal/gui            Wails 桌面壳（!nogui）；nogui.go 为无界面构建
+internal/autostart      Magpie 平台自启实现的精简移植，GUI/CLI/Web 共用
 internal/agent          Agent 接口与注册表
   ├ codex               Codex 适配器（规则见 ARCHITECTURE §4.5）
   └ claude              Claude Code 适配器
@@ -106,11 +109,12 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - 已完成：官方请求的凭据和请求体透传；第三方只使用明确配置的头部与 provider key，移除官方查询参数，不允许第三方重定向绕过路由。支持 Codex 的 zstd 压缩请求并限制解压后的大小。
 - 已完成：`core.PrepareRelay` 预览并持有进程锁，`Start` 重新校验后写入，退出按会话标记还原；默认端口占用时回退；异常退出后重启接管或 `qcs relay recover`。运行中的路由暂不能保存为普通方案。
 - 已完成：GUI/Web/托盘的共享路由控制器和生命周期；主窗口关闭只隐藏，退出应用会还原；Web 服务关闭会还原，关浏览器标签不会停止已经运行的路由。预览两分钟后自动释放。
-- 后续：跨平台开机自启、真实 Codex/CPA 验收（含压缩请求和 426 后 HTTP 回退）。不要将 CLI 进程直接启动后立即退出，否则配置会随清理还原。
+- 已完成：可选择的当前用户登录自启，只启动隐藏 GUI，不恢复路由。`nogui` 构建可检查/撤销，拒绝启用。
+- 后续：真实 Codex/CPA 验收（含压缩请求和 426 后 HTTP 回退）。不要将 CLI 进程直接启动后立即退出，否则配置会随清理还原。
 
 **其他待办**
 - 界面没有"编辑方案"功能（`PUT /api/profiles/{name}` 已有，前端未调用）；没有"测试连接"按钮。
-- 开机自启（`qcs gui --hidden` 已支持，缺各平台注册）。
+- 真实三平台登录启动验收；配置注册和所有权保护已实现，不等于真机登录已验证。
 - 会话迁移：把 `qcs-*` 上开的 Codex 会话改回 `openai`（直连模式下桌面端会话按 provider 隔离）。
 - 更多 Agent（Gemini CLI、OpenCode…）：实现 `agent.Agent` 接口并在 `core/core.go` 里空导入注册即可。
 - key 存系统钥匙串（目前 `providers.json` 权限 0600 明文）。

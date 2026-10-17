@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/zzf-857/quickerconfigswitch/internal/autostart"
 	"github.com/zzf-857/quickerconfigswitch/internal/core"
 	"github.com/zzf-857/quickerconfigswitch/internal/gui"
 	"github.com/zzf-857/quickerconfigswitch/internal/webui"
@@ -106,7 +107,11 @@ func (e *env) cmdWeb(args []string) (retErr error) {
 	}
 	token := hex.EncodeToString(raw[:])
 	control := core.NewRelayController()
-	srv := &http.Server{Handler: webHandler(webui.Options{Token: token, Relay: control}), ReadHeaderTimeout: 10 * time.Second}
+	login, err := autostart.New(gui.Available)
+	if err != nil {
+		fmt.Fprintf(e.err, "无法读取登录自启设置: %v\n", err)
+	}
+	srv := &http.Server{Handler: webHandler(webui.Options{Token: token, Relay: control, Autostart: login}), ReadHeaderTimeout: 10 * time.Second}
 	defer func() {
 		// Reject new relay operations before draining HTTP requests; a
 		// request already in flight cannot recreate a relay during exit.

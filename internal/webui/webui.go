@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/zzf-857/quickerconfigswitch/internal/autostart"
 	"github.com/zzf-857/quickerconfigswitch/internal/core"
 )
 
@@ -38,6 +39,9 @@ type Options struct {
 	// Relay belongs to the serving process, shared by all its windows.
 	// The caller must Close it during shutdown. Nil disables relay controls.
 	Relay *core.RelayController
+	// Autostart inspects/registers only this host's current-user login
+	// entry. Nil disables the setting; page loads never register it.
+	Autostart *autostart.Manager
 }
 
 // CookieName is the cookie that carries Options.Token after the first page

@@ -7,6 +7,12 @@ code and the handoff's explicit implementation status.
 
 ## Structure and conventions
 
+- This project extracts Magpie's configuration-switching functionality.
+  Before implementing a subsystem, inspect `yetone/magpie` for working code and
+  tests. Prefer copying/adapting the small relevant implementation over writing
+  another version. Keep its MIT copyright/license notice, update `NOTICE`, and
+  record the upstream commit, paths and necessary local changes in
+  `docs/UPSTREAM.md`. Do not import unrelated routing/account subsystems.
 - Go 1.26; native JavaScript modules embedded from `internal/webui/assets`.
   No npm install or frontend build is required. Match the nearby Go/JS style,
   use `gofmt`, and put user-facing UI text in the existing Chinese/English i18n map.

@@ -14,6 +14,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"github.com/zzf-857/quickerconfigswitch/internal/autostart"
 	"github.com/zzf-857/quickerconfigswitch/internal/core"
 	"github.com/zzf-857/quickerconfigswitch/internal/webui"
 )
@@ -33,6 +34,9 @@ const (
 	trayOffset = 6
 )
 
+// Available says this build can launch the desktop app at login.
+const Available = true
+
 // focusMain brings the main window up; set once the window exists.
 var focusMain atomic.Value
 
@@ -42,6 +46,12 @@ var focusMain atomic.Value
 // extension) show no tray icons at all, and the app must still be usable
 // there. It returns when the user quits from the tray menu.
 func Run(hidden bool) error {
+	login, err := autostart.New(Available)
+	if err != nil {
+		// Login startup is optional; its discovery must not prevent the
+		// user from opening the app and fixing their configuration.
+		logf("autostart: %s", core.Redact(err.Error()))
+	}
 	control := core.NewRelayController()
 	done := make(chan struct{})
 	var once sync.Once
@@ -59,7 +69,7 @@ func Run(hidden bool) error {
 		Description: "Switch Codex / Claude Code between official setup and custom providers",
 		Icon:        trayPNG,
 		// The page is served in-process, so it needs no API token.
-		Assets: application.AssetOptions{Handler: webui.Handler(webui.Options{Relay: control})},
+		Assets: application.AssetOptions{Handler: webui.Handler(webui.Options{Relay: control, Autostart: login})},
 		// Some platforms exit without returning from Run. Wails invokes
 		// OnShutdown synchronously before destroying the process.
 		OnShutdown: cleanup,

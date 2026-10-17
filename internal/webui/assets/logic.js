@@ -106,6 +106,20 @@ export function deferRefresh(modalOpen, activeTag, contentEditable = false) {
   return !!modalOpen || !!contentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(String(activeTag || '').toUpperCase());
 }
 
+/** Startup entries with unknown ownership can be inspected but never removed. */
+export function autostartPolicy(status) {
+  const supported = !!status?.supported;
+  const managed = !!status?.managed;
+  const conflict = !!status?.problem && !managed;
+  const canEnable = supported && !!status?.canEnable && !conflict;
+  return {
+    supported, managed, conflict, canEnable,
+    enabled: !!status?.enabled,
+    canDisable: managed,
+    canUpdate: managed && !status?.current && canEnable,
+  };
+}
+
 /**
  * diffLines classifies each line of a unified diff for colouring:
  * "file" (---/+++), "hunk" (@@), "add", "del", "gen" ("* " summaries of

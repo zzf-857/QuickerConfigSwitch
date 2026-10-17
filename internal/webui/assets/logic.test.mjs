@@ -71,6 +71,29 @@ test('background state changes do not interrupt dialogs or editing controls', ()
   assert.equal(L.deferRefresh(false, undefined), false);
 });
 
+test('autostart controls require host support and preserve unowned entries', () => {
+  assert.equal(L.autostartPolicy().canEnable, false);
+  assert.equal(L.autostartPolicy().canDisable, false);
+  assert.equal(L.autostartPolicy({ supported: true, canEnable: true }).canEnable, true);
+  const conflict = L.autostartPolicy({ supported: true, canEnable: true, enabled: true, managed: false, problem: 'entry was modified' });
+  assert.equal(conflict.conflict, true);
+  assert.equal(conflict.canEnable, false);
+  assert.equal(conflict.canDisable, false);
+  assert.equal(conflict.canUpdate, false);
+});
+
+test('a CLI build can remove a managed entry while GUI builds can update moved paths', () => {
+  const cli = L.autostartPolicy({ supported: true, canEnable: false, enabled: true, managed: true, current: false });
+  assert.equal(cli.canDisable, true);
+  assert.equal(cli.canEnable, false);
+  assert.equal(cli.canUpdate, false);
+  assert.equal(L.autostartPolicy({ supported: true, canEnable: false, enabled: false, managed: true }).canDisable, true, 'system-disabled entries can still be removed');
+  const gui = { supported: true, canEnable: true, enabled: true, managed: true, current: false };
+  assert.equal(L.autostartPolicy(gui).canUpdate, true);
+  assert.equal(L.autostartPolicy({ ...gui, current: true }).canUpdate, false);
+  assert.equal(L.autostartPolicy({ ...gui, enabled: false, problem: 'disabled by Task Manager' }).canEnable, true, 'a system-disabled managed entry can be enabled explicitly');
+});
+
 test('diffLines classifies lines', () => {
   const d = '--- a/x\n+++ b/x\n@@ -1 +1 @@\n ctx\n-old\n+new\n* write generated file x (3 bytes)\n';
   assert.deepEqual(L.diffLines(d).map((l) => l.kind), ['file', 'file', 'hunk', 'ctx', 'del', 'add', 'gen']);
@@ -126,6 +149,7 @@ test('i18n', () => {
   assert.equal(t('switched', { agent: 'Codex', target: 'cpa/x' }), 'Codex 已切换到 cpa/x');
   for (const k of Object.keys(strings.en)) assert.ok(k in strings.zh, `en key ${k} has no zh`);
   for (const k of Object.keys(strings.zh).filter((k) => k.startsWith('relay'))) assert.ok(k in strings.en, `relay key ${k} has no en`);
+  for (const k of Object.keys(strings.zh).filter((k) => k.startsWith('autostart'))) assert.ok(k in strings.en, `autostart key ${k} has no en`);
 });
 
 test('slot and path labels', () => {

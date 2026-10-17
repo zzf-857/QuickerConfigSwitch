@@ -62,7 +62,7 @@ type Status struct {
 
 // Problem is something Doctor found.
 type Problem struct {
-	Level   string // "warn" or "error"
+	Level   string // "info", "warn" or "error"
 	Message string
 }
 

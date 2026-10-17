@@ -171,7 +171,7 @@ func TestCurrent(t *testing.T) {
 
 	must(t, os.WriteFile(settingsPath(), []byte(`{"env":{"ANTHROPIC_BASE_URL":"https://other.example"}}`), 0o644))
 	st, _ = c.Current()
-	if st.Mode != agent.Direct || st.Provider != "" || st.Detail != "custom endpoint https://other.example (not managed by this tool)" {
+	if st.Mode != agent.Direct || st.Provider != "" || st.Detail != "自定义地址 https://other.example（不是 qcs 设置的）" {
 		t.Errorf("unknown: %+v", st)
 	}
 }

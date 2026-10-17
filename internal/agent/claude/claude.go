@@ -150,7 +150,7 @@ func (claude) Current() (agent.Status, error) {
 	path := settingsPath()
 	url, ok := edit.GetJSON(path, "env.ANTHROPIC_BASE_URL")
 	if !ok || trimURL(url) == "" {
-		return agent.Status{Mode: agent.Official, Detail: "Claude Code's own setup"}, nil
+		return agent.Status{Mode: agent.Official, Detail: "Claude Code 自己的配置"}, nil
 	}
 	model, _ := edit.GetJSON(path, "model")
 	ps, err := provider.List()
@@ -169,10 +169,10 @@ func (claude) Current() (agent.Status, error) {
 			}
 		}
 		return agent.Status{Mode: agent.Direct, Provider: p.ID, Model: model,
-			Detail: fmt.Sprintf("%s via %s", model, p.ID)}, nil
+			Detail: fmt.Sprintf("%s（经 %s）", model, p.ID)}, nil
 	}
 	return agent.Status{Mode: agent.Direct, Model: model,
-		Detail: fmt.Sprintf("custom endpoint %s (not managed by this tool)", url)}, nil
+		Detail: fmt.Sprintf("自定义地址 %s（不是 qcs 设置的）", url)}, nil
 }
 
 func (claude) Doctor() []agent.Problem {

@@ -245,7 +245,7 @@ func (c *Codex) Current() (agent.Status, error) {
 	case mp == "" || mp == "openai":
 		st := agent.Status{Mode: agent.Official, Model: model}
 		if u := top("openai_base_url"); u != "" {
-			st.Detail = fmt.Sprintf("openai_base_url = %s (custom base URL)", u)
+			st.Detail = fmt.Sprintf("openai_base_url = %s（自定义地址）", u)
 		}
 		return st, nil
 	case strings.HasPrefix(mp, TablePrefix):
@@ -256,13 +256,13 @@ func (c *Codex) Current() (agent.Status, error) {
 			if name == "" {
 				name = id
 			}
-			st.Detail = fmt.Sprintf("provider %s (%s)", name, mp)
+			st.Detail = fmt.Sprintf("provider %s（%s）", name, mp)
 		} else if cfg.err == nil {
-			st.Detail = fmt.Sprintf("model_provider %s has no [model_providers.%s] table", mp, mp)
+			st.Detail = fmt.Sprintf("model_provider %s 没有对应的 [model_providers.%s] 表", mp, mp)
 		}
 		return st, nil
 	case builtin[mp]:
-		return agent.Status{Mode: agent.Direct, Model: model, Detail: fmt.Sprintf("Codex built-in provider %s", mp)}, nil
+		return agent.Status{Mode: agent.Direct, Model: model, Detail: fmt.Sprintf("Codex 内置 provider %s", mp)}, nil
 	}
 	detail := fmt.Sprintf("provider %s set by another tool", mp)
 	if t, ok := cfg.providers()[mp]; ok {

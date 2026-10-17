@@ -366,7 +366,7 @@ fieldset[disabled] .seg-group label { cursor: default; }
 
 /* ---- toasts ---- */
 .toasts {
-  position: fixed; z-index: 60; top: 10px; left: 50%; transform: translateX(-50%);
+  position: fixed; z-index: 60; bottom: 16px; right: 16px;
   display: flex; flex-direction: column; gap: 8px; align-items: stretch;
   width: max-content; max-width: min(460px, calc(100vw - 24px));
   pointer-events: none;

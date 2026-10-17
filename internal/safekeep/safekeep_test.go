@@ -521,7 +521,7 @@ func TestPreview(t *testing.T) {
 		"-model = \"gpt-5.5\" # my favourite\n+model = \"cpa/gpt-5.5\" # my favourite\n",
 		"+model_provider = \"qcs-cpa\"\n",
 		"+[model_providers.qcs-cpa]\n",
-		"--- /dev/null\n+++ b/" + strings.TrimLeft(filepath.ToSlash(e.catalog), "/") + "\n@@ -0,0 +1,1 @@\n+{\"models\":[]}\n",
+		"* write generated file " + filepath.ToSlash(e.catalog) + " (14 bytes)\n",
 		"@@ -1,",
 	} {
 		if !strings.Contains(d, want) {
@@ -546,7 +546,7 @@ func TestPreview(t *testing.T) {
 	after := read(t, e.cfg)
 	d, err = RestorePreview("codex")
 	must(t, err)
-	for _, want := range []string{"-model_provider = \"qcs-cpa\"\n", "+model = \"gpt-5.5\" # my favourite\n", "+++ /dev/null"} {
+	for _, want := range []string{"-model_provider = \"qcs-cpa\"\n", "+model = \"gpt-5.5\" # my favourite\n", "* remove generated file " + filepath.ToSlash(e.catalog) + "\n"} {
 		if !strings.Contains(d, want) {
 			t.Errorf("no %q in\n%s", want, d)
 		}

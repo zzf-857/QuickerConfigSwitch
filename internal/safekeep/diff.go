@@ -165,3 +165,19 @@ func unifiedDiff(path string, before, after []byte, existedBefore, existsAfter b
 	}
 	return sb.String()
 }
+
+// generatedLine says in one line what happens to a file this tool writes
+// whole, "" when nothing changes.
+func generatedLine(path string, before, after []byte, existedBefore, existsAfter bool) string {
+	if existedBefore == existsAfter && string(before) == string(after) {
+		return ""
+	}
+	name := filepath.ToSlash(path)
+	switch {
+	case !existsAfter:
+		return "* remove generated file " + name + "\n"
+	case !existedBefore:
+		return fmt.Sprintf("* write generated file %s (%d bytes)\n", name, len(after))
+	}
+	return fmt.Sprintf("* update generated file %s (%d → %d bytes)\n", name, len(before), len(after))
+}

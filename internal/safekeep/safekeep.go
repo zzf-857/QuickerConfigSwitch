@@ -324,6 +324,12 @@ func preview(p *plan.Plan, restore bool) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if j.format == plan.Raw {
+			// a whole file this tool generates (Codex's model catalog):
+			// a line saying so, not thousands of lines of JSON
+			sb.WriteString(generatedLine(j.real, before[i].b, b, before[i].exists, exists))
+			continue
+		}
 		sb.WriteString(unifiedDiff(j.real, before[i].b, b, before[i].exists, exists))
 	}
 	return sb.String(), nil

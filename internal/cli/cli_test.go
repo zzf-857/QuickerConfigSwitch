@@ -127,10 +127,12 @@ func TestUseCodexAndRestore(t *testing.T) {
 	}
 	// restore
 	out = mustRun(t, "", "use", "codex", "official", "--yes")
-	if !strings.Contains(out, "exact") {
+	if !strings.Contains(out, "kept") {
 		t.Fatalf("restore: %s", out)
 	}
-	if b, _ := os.ReadFile(cfg); string(b) != codexCfg {
+	// the qcs-cpa table is deliberately kept (threads started on it); all else is original
+	b, _ = os.ReadFile(cfg)
+	if !strings.HasPrefix(string(b), codexCfg) || strings.Contains(string(b), "model_provider =") {
 		t.Fatalf("not restored:\n%s", b)
 	}
 	if out = mustRun(t, "", "restore", "codex", "--yes"); !strings.Contains(out, "无需还原") {

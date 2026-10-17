@@ -185,7 +185,7 @@ func catalogModels(p provider.Provider, chosen string, fast *bool) []codexcat.Mo
 }
 
 func notice() string {
-	return "Restart the Codex app, or start a new Codex CLI session, for the change to take effect. " +
-		"In Direct mode the Codex app lists only the threads started on this provider and runs without its ChatGPT features " +
-		"(remote control, cloud tasks, …); switching back to official restores them. auth.json is left untouched."
+	return "重启 Codex 桌面端，或新开一个 Codex CLI 会话后生效。" +
+		"直连模式下，Codex 桌面端只列出在这个 provider 上开的会话，且暂时没有 ChatGPT 登录态功能（远程控制、云任务等）；" +
+		"切回官方即恢复。auth.json 没有被修改。"
 }

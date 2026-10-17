@@ -144,7 +144,7 @@ func TestPlanBundledModelNoCatalog(t *testing.T) {
 	if want := map[string]string{"mode": "direct", "provider": "cpa", "model": "gpt-5.5"}; !reflect.DeepEqual(p.State, want) {
 		t.Fatalf("state %v", p.State)
 	}
-	if p.Agent != "codex" || !strings.Contains(p.Notice, "Restart the Codex app") || !strings.Contains(p.Notice, "auth.json") {
+	if p.Agent != "codex" || !strings.Contains(p.Notice, "重启 Codex 桌面端") || !strings.Contains(p.Notice, "auth.json") {
 		t.Fatalf("notice %q", p.Notice)
 	}
 }

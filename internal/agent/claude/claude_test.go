@@ -84,7 +84,7 @@ func TestPlanDirect(t *testing.T) {
 	if p.State["mode"] != "direct" || p.State["provider"] != "cpa" || p.State["model"] != "claude-opus-4.6" {
 		t.Errorf("state: %v", p.State)
 	}
-	if !strings.Contains(p.Notice, "Restart Claude Code") {
+	if !strings.Contains(p.Notice, "重启 Claude Code") {
 		t.Errorf("notice: %q", p.Notice)
 	}
 }

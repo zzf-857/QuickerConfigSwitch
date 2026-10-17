@@ -39,7 +39,7 @@ func defaultManagedPath() string {
 // cloudSwitches route Claude Code to a cloud and bypass ANTHROPIC_BASE_URL.
 var cloudSwitches = []string{"CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"}
 
-const notice = "Restart Claude Code (open sessions keep the old settings)."
+const notice = "重启 Claude Code 后生效（已打开的会话仍用旧设置）。"
 
 type claude struct{}
 

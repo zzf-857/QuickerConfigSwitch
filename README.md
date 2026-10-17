@@ -11,16 +11,21 @@
 
 ## 当前进度
 
-第一阶段（命令行版核心）已完成：Codex 与 Claude Code 的「官方 / 直连」两种模式，备份、原值记录、还原与漂移检测。图形界面（第二阶段）和保留订阅的本地路由（第三阶段）尚未开始。
+- 已完成：CLI 核心（Codex / Claude Code 的「官方 / 直连」切换、备份还原、漂移检测）、桌面版（托盘 + 窗口）、浏览器版 `qcs web`、方案、从 CC Switch 等导入。
+- 未开始：保留官方订阅的本地路由（模式 R）。
+- 交接说明见 [docs/HANDOFF.md](docs/HANDOFF.md)。
 
 ## 构建
 
-需要 Go 1.26（较旧的 Go 会自动下载对应工具链）。
+需要 Go 1.26（较旧的 Go 会自动下载对应工具链）。Linux 桌面版需要 `libgtk-3-dev libwebkit2gtk-4.1-dev`。
 
 ```sh
-go build -o qcs ./cmd/qcs
-go test ./...
+make build   # 带桌面界面
+make cli     # 只有命令行和 qcs web
+make test
 ```
+
+`qcs` 不带参数打开桌面界面；`qcs web` 在浏览器中打开同一界面。
 
 ## 用法
 

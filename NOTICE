@@ -27,3 +27,8 @@ Parts of this project are adapted from third-party code:
   from yetone/magpie internal/agent/claude.go at
   7660399a121af67db4efd56ecb6bd4fb04dc53f1, Copyright (c) 2026 yetone,
   MIT License — see third_party/magpie/LICENSE and docs/UPSTREAM.md.
+- internal/desktopdir and internal/agent/claudedesktop are copied/adapted from
+  yetone/magpie internal/desktopdir, internal/agent/claudedesktop.go and the
+  model filter in internal/gateway/desktop.go at
+  7660399a121af67db4efd56ecb6bd4fb04dc53f1, Copyright (c) 2026 yetone,
+  MIT License — see third_party/magpie/LICENSE and docs/UPSTREAM.md.

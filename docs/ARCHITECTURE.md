@@ -5,7 +5,9 @@
 
 ## 0. 一句话定位
 
-一个跨 Windows / macOS / Linux 的本地小工具：**给 Codex、Claude Code 等 Agent 一键切换到自定义 provider/模型，切换时只改必要的几个键，原配置（含官方订阅登录、Codex 的 Fast 模式、历史会话）都能保住，并能逐字节还原。**
+一个跨 Windows / macOS / Linux 的本地小工具：**给 Codex、Claude CLI/Desktop 切换自定义 provider/模型，只改必要键，保留原登录数据、用户设置和原值，并在还原时保留用户后续改动。**
+具体模式能否继续使用官方登录、会话的 provider 隔离和保留表等行为见 CLIENTS.md、
+REQUIREMENTS.md；不能把配置原值还原等同于所有模式的整文件哈希完全相同。
 
 ---
 
@@ -85,8 +87,8 @@ CC Switch 的 Codex 供应商同时保存 `auth`（即 `auth.json` 内容，第�
 | --- | --- | --- | --- |
 | 写入的键 | 无（还原态） | `model_provider`、`model`、`[model_providers.qcs-<id>]`，需要时加 `model_catalog_json` | **只有** `openai_base_url = "http://127.0.0.1:<port>/backend-api/codex"` |
 | `auth.json` | 不碰 | 不碰（还在，但 D 期间不用） | 不碰，**照常使用** |
-| ChatGPT 登录态（远程控制、云任务、Chrome 插件等） | ✅ | ❌（桌面端进入 API 状态） | ✅ |
-| 历史会话可见 | ✅ | 只见 `qcs-<id>` 的会话 | ✅ 全部可见（provider 仍是 `openai`） |
+| ChatGPT 登录态（远程控制、云任务、Chrome 插件等） | 官方客户端决定 | 桌面端进入 API 状态 | 保持官方 provider 和认证方式；具体功能待真机验收 |
+| 历史会话可见 | 官方 provider 的会话 | 只见 `qcs-<id>` 的会话 | 仍按官方 provider 列会话；旧直连会话仍有 provider 隔离 |
 | 官方模型 | ✅ | 走 CPA（"全走 CPA"） | 子模式「并存」：官方模型走 ChatGPT，自定义模型走 CPA；子模式「全走 CPA」：全部走 CPA |
 | Fast | ✅ | ✅：GPT 系列用内置目录；其它模型由我们生成 `model_catalog_json` 并带 `service_tiers` | ✅：官方模型用后端给的档位；自定义模型由路由生成的目录带档位 |
 | 依赖 | 无 | 无 | 本地路由进程必须在跑（关闭时自动去掉 `openai_base_url`） |
@@ -278,22 +280,36 @@ openai_base_url = "http://127.0.0.1:17321/backend-api/codex"
 
 ```jsonc
 {
-  "model": "opus",
+  "model": "claude-opus-5-5",
   "env": {
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:8317",
     "ANTHROPIC_AUTH_TOKEN": "sk-xxx",
     "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-5-5",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "...",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "..."
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-opus-5-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-opus-5-5",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-opus-5-5",
+    "ANTHROPIC_CUSTOM_HEADERS": ""
   }
 }
 ```
 
-- 只改 `env` 下这几个键和 `model`；用户原有的 `ANTHROPIC_*` 进 stash，还原时放回。
-- claude.ai 登录（`.credentials.json` / 钥匙串）不碰；还原后立刻回到订阅。
-- doctor 检查（来自 magpie 的教训）：托管设置 `managed-settings.json` 里的 `ANTHROPIC_BASE_URL` 会盖过用户设置；`CLAUDE_CODE_USE_BEDROCK/VERTEX/...` 开着会绕过 `ANTHROPIC_BASE_URL`；shell 里的 `ANTHROPIC_API_KEY` 会冲突；Claude 模型 id 里的点号要写成短横线（`claude-opus-4.6` 会被认成 Opus 4）。
-- Claude Code 的 fast（`speed: "fast"`）原样透传，是否生效取决于上游。
-- 不做"claude.ai 登录 + 第三方并存"：那需要把 claude.ai 的 OAuth 凭据经第三方转发，magpie 也刻意不这样做。
+- 只改当前单一 provider 所需的 env/model，以及显式请求的 effort；清理冲突云/子代理/
+  workflow 别名与过期模型标签。原值进 stash，还原时保留用户期间的新改动。
+- claude.ai 登录（`.credentials.json` / 钥匙串）不碰；切回原配置并重启后使用原登录。
+  空认证可能让 CLI 把官方 OAuth 发到第三方，因此直连需明确第三方 token/Authorization。
+- 模型 ID 保持上游原样。原生 CLI 可能错误识别 dotted ID 的能力；直连不能照搬 Magpie
+  依赖网关反向映射的 dashed 改写，显式 effort 不可靠时直接拒绝。
+- managed 配置覆盖目标键时拒绝切换，完整处理六种云开关；显式 effort 同时校验原生
+  能力、provider 声明和现有 maxEffortLevel，不放宽原上限。细节见 CLIENTS.md。
+- Claude CLI 的 Fast 由客户端管理，本工具不接管它的流量或接受直连 Fast 覆盖。
+
+### 4.7.1 Claude Desktop
+
+独立 `claude-desktop` 适配器将 Magpie 的 3p wiring 改为 plan/safekeep：必要的 gateway
+profile/meta 先写，两个 deploymentMode 最后写；多文件失败一起回滚，原登录文件不写。
+MSIX 不同版本的两套目录分别记录原值，界面用服务端 ModelRefs 限制可配置的模型。
+只提取单一 Anthropic endpoint/Claude 模型配置，不引入多模型别名转换、账户池或出站策略。
+3p 不继续使用官方 Anthropic 登录；完整支持范围及数据隔离见 CLIENTS.md。
 
 ### 4.8 `relay`：本地路由（模式 R，可选模块）
 

@@ -3,6 +3,8 @@
 核验日期：2026-10-17。范围是从 Magpie 提取配置切换能力：保留原客户端配置，
 增加自定义 provider/模型，保留官方登录及 Fast，按键修改并可安全还原。
 代码和自动回归已覆盖以下要求；真实桌面账号及 CPA 的最终验收仍见 ACCEPTANCE.md。
+Codex CLI、ChatGPT/Codex Desktop、Claude CLI 和 Claude Desktop 的逐端支持与遗漏复盘
+见 CLIENTS.md；ChatGPT 聊天端和 Claude 的 3p 登录边界不能混为一谈。
 
 ## 推荐使用方式
 

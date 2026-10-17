@@ -6,22 +6,25 @@ export const OFFICIAL = 'official';
 export function servesAgent(p, agentID) {
   const apis = p.apis || {};
   if (agentID === 'codex') return !!apis.responses;
-  if (agentID === 'claude') return !!apis.anthropic;
+  if (agentID === 'claude' || agentID === 'claude-desktop') return !!apis.anthropic;
   return !!(apis.responses || apis.chat || apis.anthropic);
 }
 
 /**
  * modelGroups lists, per provider that can serve the agent, the models it
  * offers: [{provider: {id,name}, models: [{ref, id, name, efforts, fast}]}].
- * Providers without models are left out.
+ * Providers without models are left out. modelRefs, when supplied by an
+ * adapter, restricts choices to models that client can actually configure.
  */
-export function modelGroups(providers, agentID) {
+export function modelGroups(providers, agentID, modelRefs) {
   const out = [];
   for (const p of providers || []) {
-    if (!servesAgent(p, agentID) || !(p.models || []).length) continue;
+    if (!servesAgent(p, agentID)) continue;
+    const models = (p.models || []).filter((m) => !Array.isArray(modelRefs) || modelRefs.includes(`${p.id}/${m.id}`));
+    if (!models.length) continue;
     out.push({
       provider: { id: p.id, name: p.name || p.id },
-      models: p.models.map((m) => ({
+      models: models.map((m) => ({
         ref: `${p.id}/${m.id}`, id: m.id, name: m.name || m.id,
         efforts: m.efforts || [], fast: !!m.fast,
       })),
@@ -77,7 +80,7 @@ export function buildRequest(agentID, ref, fast, effort) {
   if (r.ref !== OFFICIAL) {
     const f = fastValue(fast);
     if (agentID === 'codex' && f !== undefined) r.fast = f;
-    if (effort) r.effort = effort;
+    if (effort && agentID !== 'claude-desktop') r.effort = effort;
   }
   return r;
 }

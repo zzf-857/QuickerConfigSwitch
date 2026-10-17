@@ -279,9 +279,12 @@ func TestPreviewUseAndBack(t *testing.T) {
 		t.Fatal("preview wrote")
 	}
 	res := c.do("POST", "/api/use", req, 200)
-	a := get(res, "state", "agents", 1)
-	if get(a, "id") != "codex" {
-		a = get(res, "state", "agents", 0)
+	var a any
+	for _, view := range get(res, "state", "agents").([]any) {
+		if get(view, "id") == "codex" {
+			a = view
+			break
+		}
 	}
 	if get(a, "provider") != "cpa" || get(a, "model") != "gpt-5.5" || get(a, "fast") != "true" || get(a, "managed") != true {
 		t.Fatalf("after use: %v", a)

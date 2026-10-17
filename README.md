@@ -2,11 +2,12 @@
 
 跨 Windows / macOS / Linux 的本地 Agent 配置快速切换工具。
 
-- 给 Codex、Claude Code 一键切换到自定义 provider / 模型
+- 给 Codex CLI/桌面端、Claude Code CLI、Claude Desktop 切换自定义 provider / 模型
 - 只改必要的键，注释与格式原样保留；随时还原原配置
 - 不碰官方登录文件（Codex 的 `auth.json`、Claude Code 的凭据）：切回即恢复官方订阅
 - Codex 切到第三方（如 CPA）后仍保留 Fast 模式
 
+各客户端配置、登录边界与 Magpie 复盘见 [docs/CLIENTS.md](docs/CLIENTS.md)。
 核心要求、证据和验收边界见 [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)，
 架构设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
@@ -14,6 +15,7 @@
 
 - 已完成：CLI 核心（Codex / Claude Code 的「官方 / 直连」切换、备份还原、漂移检测）、桌面版（托盘 + 窗口）、浏览器版 `qcs web`、方案、从 CC Switch 等导入。
 - 已实现：模式 R 本地路由（官方与第三方并存、全走第三方、退出还原及异常退出恢复），支持 CLI、桌面/Web 界面和托盘状态/停止，以及可选择的登录自启。
+- 已补齐：Claude CLI 认证/后台模型/effort 细节，以及独立的 Claude Desktop 3p 配置入口。ChatGPT/Codex 桌面端按应用标识识别，与 Codex CLI 共用配置。
 - 交接说明见 [docs/HANDOFF.md](docs/HANDOFF.md)。
 
 ## 构建
@@ -78,6 +80,18 @@ Ctrl+C 或 SIGTERM 会停止路由并还原原来的地址。异常退出后，�
 `qcs web` 由服务进程持有路由，关闭浏览器标签不停止已启动的路由；停止服务会还原。另一个 CLI/桌面进程持有的路由会显示为外部进程，本窗口不能代替它停止。运行中的路由不能保存为方案；先停止路由再进行 Codex 直连切换或应用包含 Codex 的方案。路由使用启动时的 provider 配置，编辑 provider 后需停止并重启才生效。
 
 官方 Codex CLI 0.159.2 已在隔离配置下验证模型目录加载及 Fast 档位；真实订阅登录、CPA Fast、原生托盘和完整桌面交互仍需要用户机器验收。自动测试使用本地假后端，不需要真实密钥。官方认证失效或桌面端因订阅额度耗尽阻止发起请求时，本工具不承诺绕过客户端限制。
+
+## Claude CLI / Desktop
+
+```sh
+qcs use claude cpa/claude-opus-4-6 --effort high
+qcs use claude-desktop cpa/claude-opus-4-6
+qcs use claude-desktop official
+```
+
+选择上游实际支持的精确模型 ID。Claude CLI 支持 provider 请求头，阻止空认证回退到官方 OAuth；保留原登录文件和 effort 上限。Claude Desktop 使用独立的 3p 部署模式，当前支持 Code/Cowork 的标准 Claude 兼容模型、Anthropic 根地址和 API key；不提供任意模型转换或自定义请求头。切回恢复原配置，改动后完整退出并重开客户端。
+
+Claude Desktop 的官方登录、MCP 和会话数据保留在原目录，第三方模式使用单独的 `Claude-3p` 目录。详细支持范围及未验收项目见 [docs/CLIENTS.md](docs/CLIENTS.md)。
 
 ## 登录自启
 

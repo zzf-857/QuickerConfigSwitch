@@ -24,6 +24,7 @@
 | `internal/agent/codex/proxy.go`（阶段 F） | `internal/agent/codex_proxy.go`、`codex_proxy_test.go` | 复制 reqwest 环境变量/NO_PROXY 匹配及回归；不引入 login shell、系统代理或修改代理配置 |
 | 显式请求头子表支持（阶段 F） | `internal/agent/codex_headers_table_test.go`、`internal/edit/toml.go` 的 Inline→子表合并 | safekeep 拆分子表所有权、迁移旧 inline 记录；新增小型 quoted-key 编辑入口复用原语；新文件 0600 在调用层处理 |
 | `internal/agent/claude`（阶段 G） | `internal/agent/claude.go` 的 cloudSwitches、writeTiers/dropAbout、claudeName/claudeEffortsFor/effort 字段；`internal/provider/claudedash.go` | 提取云/别名/能力清理和 effort 规则；直连没有网关反向映射，保留精确 ID；加认证隔离、原有上限及管理员冲突检查 |
+| `internal/desktopdir`、`internal/agent/claudedesktop`（阶段 H） | `internal/desktopdir/desktopdir.go` 及测试；`internal/agent/claudedesktop.go` 的路径、profile/meta/deploymentMode 写入；`internal/gateway/desktop.go` 的模型过滤 | 复制多平台/MSIX 路径与 recency 逻辑，写入改为 plan/safekeep；只支持单一 Anthropic endpoint/Claude 兼容模型，保留原登录/用户数据，不复制账户池或别名路由网关 |
 
 Magpie 的配置适配器与网关不是直接整包复制的目标：它们还包含账户、路由组、
 后台守护进程和自动重启等本项目暂不需要的功能。只提取当前配置切换所需部分。
@@ -44,6 +45,10 @@ Magpie 的配置适配器与网关不是直接整包复制的目标：它们还�
 - Claude CLI 的新行为还用官方 npm 分发的 2.1.302 实际请求核对，分发归档经过其
   SHA512 integrity 校验。空 token 会回退官方 OAuth、X-Api-Key-only 不阻止附带 OAuth，
   直连需第三方 token 或明确 Authorization；这与 Magpie 自有网关负责隔离的边界不同。
+- Desktop 的 `inferenceModels` 与直接 gateway profile 格式还核对了 CC Switch
+  `7344cc37865da59308bca1a90c95ab2ee05c957c` 的 `claude_desktop_config.rs`；
+  只作格式证据，未复制它的实现。未知 URL 子路径和需要网关转换的模型直接拒绝，
+  不把配置写入成功当成客户端实际支持。不同客户端边界见 CLIENTS.md。
 
 ## 接手时的操作
 

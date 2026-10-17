@@ -1,11 +1,11 @@
 # 交接文档
 
 > 截至 2026-10-17。后续工作按阶段验证并提交；阶段状态见 [STAGES.md](STAGES.md)，具体提交见 Git 历史。原交接分支为 `claude/exciting-galileo-cgd4uk`。
-> 接手顺序：[AGENTS.md](../AGENTS.md)（开发规范）→ [README.md](../README.md)（用法）→ 本文与 [STAGES.md](STAGES.md)（状态/下一步）→ [REQUIREMENTS.md](REQUIREMENTS.md)（核心要求核验）→ [UPSTREAM.md](UPSTREAM.md)（Magpie 复用）及 [ACCEPTANCE.md](ACCEPTANCE.md)（真机验收）→ [ARCHITECTURE.md](ARCHITECTURE.md)（设计细节）。
+> 接手顺序：[AGENTS.md](../AGENTS.md)（开发规范）→ [README.md](../README.md)（用法）→ 本文与 [STAGES.md](STAGES.md)（状态/下一步）→ [CLIENTS.md](CLIENTS.md)（四端配置与边界） → [REQUIREMENTS.md](REQUIREMENTS.md)（核心要求核验）→ [UPSTREAM.md](UPSTREAM.md)（Magpie 复用）及 [ACCEPTANCE.md](ACCEPTANCE.md)（真机验收）→ [ARCHITECTURE.md](ARCHITECTURE.md)（设计细节）。
 
 ## 1. 一句话现状
 
-CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、GUI/Web 和托盘生命周期管理**，并复用了 Magpie 的可选登录自启、目录回退与命名空间检查。阶段 A–G 已完成并经测试，具体记录见 [STAGES.md](STAGES.md)，复用映射见 [UPSTREAM.md](UPSTREAM.md)。保留活动官方登录且所有模型请求走 CPA，应使用「本地路由 + 全走上游」。官方 Codex CLI 0.159.2 已用隔离配置验证目录及 Fast 档位；真实用户桌面、账号与 CPA 的最终验收仍未完成，不能以本地测试替代。
+CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、GUI/Web 和托盘生命周期管理**，并复用了 Magpie 的可选登录自启、目录回退与命名空间检查。Claude Desktop 已有独立的 3p 适配和界面入口，具体四端支持与登录边界见 CLIENTS.md。阶段 A–H 已完成并经测试，具体记录见 [STAGES.md](STAGES.md)，复用映射见 [UPSTREAM.md](UPSTREAM.md)。保留活动官方登录且所有模型请求走 CPA，应使用「本地路由 + 全走上游」。官方 Codex CLI 0.159.2 已用隔离配置验证目录及 Fast 档位；真实用户桌面、账号与 CPA 的最终验收仍未完成，不能以本地测试替代。
 
 ## 2. 已完成的功能
 
@@ -14,7 +14,8 @@ CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、G
 | 自定义 provider 增删改、拉取 `/v1/models`、每个模型的 Fast 开关 | `qcs provider …`、界面 Providers 页 | 单元测试 + httptest |
 | Codex 直连第三方（模式 D），保留 `auth.json`、用户的 `service_tier`/Fast、`[features]`、CC Switch 表 | `qcs use codex cpa/<model>`、界面 Agents 页 | 单元 + 端到端 + 手工冒烟 |
 | 为 Codex 生成带 Fast 档位的模型目录（`model_catalog_json`）；保留/还原原自定义目录指向 | 自动 | 单元 + 端到端 + 官方 CLI 隔离加载 |
-| Claude Code 直连第三方（写 `settings.json` 的 `env`），保留 JSONC 注释 | `qcs use claude …` | 单元 + 端到端 |
+| Claude Code 直连第三方（写 `settings.json` 的 `env`），保留 JSONC 注释、原认证/模型/effort 上限 | `qcs use claude …` | 单元 + 端到端 + 官方 CLI 本地 SSE |
+| Claude Desktop 独立 3p 配置，保留原数据与登录，MSIX 两套路径 | `qcs use claude-desktop …`、独立界面卡片 | 临时配置/路径/回滚/权限 race + API/浏览器流程；原生应用待验收 |
 | 切回官方：文件没被别人改过时逐字节还原，否则只撤销 qcs 写的键 | `qcs use <agent> official` / `qcs restore` | 单元 + 端到端 |
 | 先预览差异再确认；预览/界面/CLI 中的 API key 一律遮盖 | 全部入口 | 单元 |
 | 漂移检测（被 CC Switch 或 Codex 自己的 `/model` 改过）、冲突检查 | `qcs doctor`、界面「检查」 | 单元 |
@@ -65,6 +66,7 @@ make cli
 - 阶段 E：补齐 provider 未拉取模型时的 Fast 默认、原有自定义目录切换/还原、旧版活动 profile 冲突保护、获取不到状态锁时零写入。新增组合测试覆盖活动官方登录、全走 CPA、Fast 和凭据隔离；详见 REQUIREMENTS.md 与 STAGES.md。
 - 阶段 F：Codex 认证覆盖与静态/动态旧认证头冲突保护、显式请求头子表还原/漂移及旧记录迁移；桌面身份识别、loopback 代理诊断和新文件私有创建。原有缺省权限不被更改。
 - 阶段 G：Claude CLI 补齐云/子代理/后台模型/元数据、精确 ID、自定义请求头和显式 effort/上限；拒绝空认证导致官方 OAuth 传到第三方的路径。官方 CLI 2.1.302 六项临时本地请求检查通过。
+- 阶段 H：独立 Claude Desktop 3p 适配、Magpie 多平台/MSIX 路径、服务端兼容模型筛选和界面卡片完成；真实后端 Chromium 取消/确认/还原及权限流程通过。最终 GTK3/`nogui` 各 20 个测试包、368 个顶层测试通过、2 个条件跳过，19 项前端测试通过；两种 vet、依赖校验与三平台构建通过。两个官方 CLI 合同脚本在最终构建重跑通过。
 
 ## 4. 代码地图
 
@@ -78,9 +80,12 @@ internal/relay          Codex 官方 / 第三方 HTTP 路由、模型目录合�
 internal/webui          JSON API + 内嵌页面（assets/ 下原生 JS，无构建步骤）
 internal/gui            Wails 桌面壳（!nogui）；nogui.go 为无界面构建
 internal/autostart      Magpie 平台自启实现的精简移植，GUI/CLI/Web 共用
+internal/desktopapp     Codex/ChatGPT 桌面应用身份识别（不按名字误识别聊天应用）
+internal/desktopdir     Claude Desktop 多平台/MSIX 配置路径与最近运行目录
 internal/agent          Agent 接口与注册表
   ├ codex               Codex 适配器（规则见 ARCHITECTURE §4.5）
-  └ claude              Claude Code 适配器
+  ├ claude              Claude Code CLI 适配器
+  └ claudedesktop       Claude Desktop 单一 Anthropic 3p 适配器，独立管理状态
 internal/plan           变更计划类型：适配器只产出计划，不写文件
 internal/safekeep       执行计划：快照、滚动备份、stash（原值）、applied（写入值）、还原、漂移、预览
 internal/codexcat       Codex 模型目录生成（含内置 models.json 与提示词）
@@ -100,6 +105,7 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - `safekeep.lockAll`：获取不到跨进程锁时必须返回错误；不能忽略 Magpie 通用锁原语的 held=false。直连旧版活动 profile 若覆盖计划则拒绝；现代独立 `--profile` 配置层需由客户端启动方式确认。
 - 新配置在写入密钥前设为 0600，已有配置权限保留；含还原时重建保留 provider 表的路径。Codex 直连拒绝已有 qcs provider 的冲突认证，不静默删用户键；桌面检测按应用身份区分 Codex 与同名 ChatGPT 聊天端。loopback 代理诊断仅覆盖当前进程环境。
 - `written.DeletedKeys` 只记录已明确拥有的键级删除，用于旧 inline→请求头子表迁移时恢复原先被覆盖删除的头；不能把缺失的任意键猜成 qcs 删除。Windows 的新文件权限依赖用户目录继承的 ACL，Unix 的 0600 检查不代替 Windows ACL 验收。
+- `AgentView.ModelRefs`：nil 表示无额外模型限制，空数组表示没有可用模型；Desktop 的可配置模型由适配器 SupportsModel 统一筛选，前端不重复维护正则规则。Desktop 不接受界面/CLI 的 Fast 或 effort 覆盖，登录状态不读取并显示未知。
 - 模型列表为空时用已有 `provider.DefaultFast` 补齐临时模型能力，显式 Fast=false 仍保留。直连若已有自定义目录则改指向 provider 目录，不编辑原文件；后续切换可能继续使用生成目录，直到还原时恢复原指向。
 - GUI/Web 的 `core.RelayController` 由宿主进程创建并负责 Close；Handler 不隐式创建生命周期。Wails `OnShutdown` 必须同步清理，单用 defer 在部分平台无效。路由预览返回一次性 ID，确认只用该 ID；关闭/超时不能保留进程锁。
 - 数据目录：`appdir.Dir()`（可用 `QCS_HOME` 覆盖）下的 `providers.json`、`profiles.json`、`state/stash.json`、`state/applied.json`、`backups/`、`codex/catalog-*.json`。
@@ -123,6 +129,8 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - 范围：「全走上游」只针对 Responses/compact 模型请求，其它官方路径仍走官方；Fast 档位透传不保证实际提速。认证失效照常显示；官方额度耗尽时客户端可能拒绝发送，未移植 Magpie 完整额度检测/API 状态回退。详见 REQUIREMENTS.md。
 
 **其他待办**
+- 先完成 CLIENTS.md / ACCEPTANCE.md 中四端的真机检查，保持配置提取范围；不要把独立 ChatGPT 聊天端、Claude 3p 的活动登录或任意模型转换标成已实现。
+- Desktop 元数据 entries 按整个数组还原；用户期间增改其它 profile 时可能保留非活动 qcs 列表项并报告，空目录也可能保留。若要按 ID 精确清理，先复用 Magpie 的条目合并逻辑并完善 ownership，不能覆盖用户新条目。
 - 界面没有"编辑方案"功能（`PUT /api/profiles/{name}` 已有，前端未调用）；没有"测试连接"按钮。
 - 真实三平台登录启动验收；配置注册和所有权保护已实现，不等于真机登录已验证。
 - 会话迁移：把 `qcs-*` 上开的 Codex 会话改回 `openai`（直连模式下桌面端会话按 provider 隔离）。
@@ -143,5 +151,6 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 几处 "WIP …" 提交是子代理工作中途的检查点，后续提交已完成对应内容，不需要处理。
 
 本轮按阶段提交，不使用中途 WIP：A 为安全还原与 CLI 路由，B 为共享 GUI/Web 路由管理，
-C 为 Magpie 自启移植，D 为上游回退/命名空间与认证头还原，E 为核心需求核验及边界修复。阶段边界与验证在 STAGES.md，
+C 为 Magpie 自启移植，D 为上游回退/命名空间与认证头还原，E 为核心需求核验及边界修复，
+F 为 Codex 认证/请求头/桌面兼容，G 为 Claude CLI，H 为 Claude Desktop。阶段边界与验证在 STAGES.md，
 真实机器尚未验证的条目在 ACCEPTANCE.md；之后接手先核对这些文档与 `git log`。

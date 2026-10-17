@@ -32,7 +32,8 @@ function signInBadge(a) {
     const key = `signIn_${a.signIn}`;
     out.push(h('span', { class: 'badge badge-info' }, t(['chatgpt', 'claudeai', 'apikey'].includes(a.signIn) ? key : 'signIn_other')));
   } else {
-    out.push(h('span', { class: 'badge badge-muted' }, t(a.signIn === 'keyring' ? 'signIn_keyring' : 'signedOut')));
+    const key = a.signIn === 'keyring' ? 'signIn_keyring' : a.signIn === 'unknown' ? 'signIn_unknown' : 'signedOut';
+    out.push(h('span', { class: 'badge badge-muted' }, t(key)));
   }
   return out;
 }
@@ -63,7 +64,7 @@ function driftBox(a) {
 }
 
 function modelSelect(app, a, pick, onChange, disabled) {
-  const groups = modelGroups(app.state.providers, a.id);
+  const groups = modelGroups(app.state.providers, a.id, a.modelRefs);
   const id = `model-${a.id}`;
   const sel = h('select', { id, disabled, onchange: (e) => onChange(e.target.value) },
     h('option', { value: OFFICIAL }, t('official')),
@@ -275,6 +276,8 @@ function agentCard(app, a) {
       h('h2', { id: `agent-${a.id}` }, a.name),
       h('div', { class: 'badges' }, signInBadge(a))),
     currentLine(a),
+    codex ? h('small', { class: 'muted' }, t('codexClientsHint')) : null,
+    a.id === 'claude-desktop' ? h('div', { class: 'notice notice-info' }, t('claudeDesktopHint')) : null,
     a.detail ? h('div', { class: 'detail muted' }, a.detail) : null,
     a.error ? h('div', { class: 'notice notice-error' }, a.error) : null,
     codex && policy.state !== 'idle' ? relayView(app) : null,
@@ -294,7 +297,7 @@ function agentCard(app, a) {
       ] : null,
       h('div', { class: 'controls-row' },
         codex ? fastControl(a, pick, isOff || routing || locked, (v) => { pick.fast = v; }) : null,
-        effortControl(app, a, pick, (v) => { pick.effort = v; }, routing || locked))),
+        a.id !== 'claude-desktop' ? effortControl(app, a, pick, (v) => { pick.effort = v; }, routing || locked) : null)),
     h('div', { class: 'actions' }, switchBtn, checkBtn),
     outcomeView(outcomes[a.id]),
     doctorView(doctorRuns[a.id])]);

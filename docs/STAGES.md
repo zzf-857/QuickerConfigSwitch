@@ -5,7 +5,8 @@
 测试计数只描述对应阶段的检查，不当作后续阶段的固定基线。
 
 已提交的阶段入口：A `96f94d4`，B `3865bec`，C `1ca7516`，D `f67c90c`。
-阶段 E 为 `6893f29`。后续阶段的最终 SHA 用 `git log --oneline` 查看。
+阶段 E 为 `6893f29`，F 为 `9a5a6ff`，G 为 `3d3c17b`。阶段 H 随本记录提交，
+最终 SHA 用 `git log --oneline` 查看。
 远端交接目标为 `origin/claude/exciting-galileo-cgd4uk`，
 提交与远端状态分别以 Git 历史、远端引用为准。
 
@@ -110,6 +111,23 @@
   Authorization 及原有 effort 上限；配置逐字节恢复，登录文件内容/身份/时间/权限保持。
 - 可重跑 `scripts/check_claude_contract.py --qcs ./qcs --claude /path/to/claude`，
   需要 Python 3.11+；只用临时配置、假令牌及 loopback 后端，不访问真实账户或远端模型。
+
+## 阶段 H：Claude Desktop 单一配置与四端支持矩阵（已完成）
+
+- 精简复制 Magpie 的 Desktop 路径/配置合同，独立 `claude-desktop` ID；通过已有
+  plan/safekeep 写入 profile、meta 和两个部署模式，原登录/CLI/MCP/会话数据保留。
+- 复制 macOS/Linux/Windows/MSIX 路径和最近运行目录判断，多个配置副本失败一起回滚。
+- 只接受可直接配置的 Claude 模型、Anthropic gateway 根地址与有效 bearer key；
+  不静默忽略自定义头/Fast/effort，不引入任意模型转换或 Cowork 通配出站策略。
+- 服务端给出 ModelRefs，界面只列兼容选择，登录状态显示未知，不误称官方登录仍活跃。
+- 新增往返/漂移/异常配置/私有权限、API/Core 集成及前端过滤回归；真实后端 Chromium
+  验证卡片、模型筛选、取消零写入、确认写入 0600 profile、切回删除生成文件及无脚本错误。
+- 最终全量：GTK3/`nogui` 各 20 个测试包、368 个顶层测试通过；2 个条件跳过
+  （无第二用户组、文件锁子进程 helper）。两种 race/vet、19 项前端测试和依赖校验通过；
+  Linux GTK3、Windows amd64 GUI、macOS arm64 CLI 构建通过。
+- 最终构建再次通过官方 Codex 0.159.2 三项目录合同及 Claude CLI 2.1.302 六项本地请求合同。
+- 客户端支持/登录边界、真实桌面待验收与已知元数据数组/空目录边界见 CLIENTS.md、
+  ACCEPTANCE.md；实现与来源见 UPSTREAM.md。真机行为不以夹具或交叉编译替代。
 
 ## 后续验收与优化
 

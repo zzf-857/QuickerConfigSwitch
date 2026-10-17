@@ -3,7 +3,8 @@
 Read `README.md` for user behavior, `docs/HANDOFF.md` for current state and
 `docs/STAGES.md` for the active stage and its validation. `docs/ARCHITECTURE.md`
 explains the design; where it still describes future work, follow the running
-code and the handoff's explicit implementation status.
+code and the handoff's explicit implementation status. Read `docs/CLIENTS.md`
+for the Codex/ChatGPT desktop and Claude CLI/Desktop configuration boundaries.
 
 ## Structure and conventions
 
@@ -20,6 +21,12 @@ code and the handoff's explicit implementation status.
   configuration. `safekeep` owns snapshots, atomic writes, drift and restoration.
 - Never write Codex `auth.json` or Claude login credentials. Keep unrelated
   settings, comments, BOM/CRLF and links; restore only values still owned by qcs.
+- Direct endpoints must receive exact provider model IDs. Magpie's gateway can
+  reverse aliases; a configuration-only adapter cannot. Preserve existing
+  effort caps and reject unsupported selections rather than reporting success.
+- Claude Desktop is a separate 3p deployment using its own user-data folder.
+  Preserve official login data without claiming it is active in 3p. Keep the
+  model compatibility rule in the adapter and expose ModelRefs to the UI.
 - Relay listeners belong to a long-lived process. Preview before applying,
   use a session marker for cleanup, and release listeners/locks on every exit.
   An old session must not undo a newer switch.

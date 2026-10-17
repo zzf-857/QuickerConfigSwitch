@@ -16,6 +16,15 @@ test('modelGroups filters by what the agent needs', () => {
   assert.equal(L.modelGroups(providers, 'codex')[0].models[0].ref, 'cpa/gpt-5.5');
 });
 
+test('desktop choices follow the adapter restrictions instead of offering every model', () => {
+  assert.deepEqual(L.modelGroups(providers, 'claude-desktop', ['cpa/claude-x']), [
+    { provider: { id: 'cpa', name: 'CPA' }, models: [{ ref: 'cpa/claude-x', id: 'claude-x', name: 'claude-x', efforts: [], fast: false }] },
+  ]);
+  assert.deepEqual(L.modelGroups(providers, 'claude-desktop', []), []);
+  assert.deepEqual(L.modelGroups(providers, 'claude', null).map((g) => g.provider.id), ['cpa', 'ant']);
+  assert.deepEqual(L.buildRequest('claude-desktop', 'cpa/claude-x', 'on', 'high'), { agent: 'claude-desktop', ref: 'cpa/claude-x' });
+});
+
 test('refs and requests', () => {
   assert.deepEqual(L.parseRef('cpa/openai/gpt-5'), { provider: 'cpa', model: 'openai/gpt-5' });
   assert.equal(L.parseRef('official'), null);

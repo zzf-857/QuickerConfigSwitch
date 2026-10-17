@@ -10,8 +10,9 @@ import (
 	"strings"
 
 	"github.com/zzf-857/quickerconfigswitch/internal/agent"
-	_ "github.com/zzf-857/quickerconfigswitch/internal/agent/claude" // registers Claude Code
-	_ "github.com/zzf-857/quickerconfigswitch/internal/agent/codex"  // registers Codex
+	_ "github.com/zzf-857/quickerconfigswitch/internal/agent/claude"        // registers Claude Code
+	_ "github.com/zzf-857/quickerconfigswitch/internal/agent/claudedesktop" // registers Claude Desktop
+	_ "github.com/zzf-857/quickerconfigswitch/internal/agent/codex"         // registers Codex
 	"github.com/zzf-857/quickerconfigswitch/internal/plan"
 	"github.com/zzf-857/quickerconfigswitch/internal/provider"
 	"github.com/zzf-857/quickerconfigswitch/internal/safekeep"
@@ -22,13 +23,16 @@ const Official = "official"
 
 // AgentView is one agent as a page shows it.
 type AgentView struct {
-	ID        string           `json:"id"`
-	Name      string           `json:"name"`
-	Installed bool             `json:"installed"`
-	SignedIn  bool             `json:"signedIn"`
-	SignIn    string           `json:"signIn,omitempty"`
-	Dir       string           `json:"dir,omitempty"`
-	Modes     []agent.Mode     `json:"modes"`
+	ID        string       `json:"id"`
+	Name      string       `json:"name"`
+	Installed bool         `json:"installed"`
+	SignedIn  bool         `json:"signedIn"`
+	SignIn    string       `json:"signIn,omitempty"`
+	Dir       string       `json:"dir,omitempty"`
+	Modes     []agent.Mode `json:"modes"`
+	// ModelRefs is nil when all protocol-compatible provider models apply.
+	// An adapter with further client restrictions supplies its exact choices.
+	ModelRefs []string         `json:"modelRefs"`
 	Mode      agent.Mode       `json:"mode"`
 	Provider  string           `json:"provider,omitempty"`
 	Model     string           `json:"model,omitempty"`
@@ -61,6 +65,22 @@ func View(a agent.Agent) AgentView {
 		v.Error = err.Error()
 	}
 	v.Mode, v.Provider, v.Model, v.Detail = st.Mode, st.Provider, st.Model, st.Detail
+	if filter, ok := a.(interface {
+		SupportsModel(provider.Provider, provider.Model) bool
+	}); ok {
+		v.ModelRefs = []string{}
+		ps, err := provider.List()
+		if err != nil {
+			v.Error = err.Error()
+		}
+		for _, p := range ps {
+			for _, m := range p.Models {
+				if filter.SupportsModel(p, m) {
+					v.ModelRefs = append(v.ModelRefs, p.ID+"/"+m.ID)
+				}
+			}
+		}
+	}
 	if v.Managed {
 		s := safekeep.State(a.ID())
 		v.Fast, v.Effort = s["fast"], s["effort"]

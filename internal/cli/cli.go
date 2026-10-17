@@ -20,6 +20,9 @@ var Version = "dev"
 const usageText = `qcs - 在官方配置与自定义 provider 之间快速切换 Codex / Claude Code
 
 用法:
+  qcs                                      打开桌面界面 (托盘 + 窗口), 同 qcs gui
+  qcs web [--port N] [--host 127.0.0.1] [--no-open] [--allow-remote]
+                                           在浏览器中打开 (默认端口 17320, 带随机 token)
   qcs ls                                   各 Agent 当前状态
   qcs provider ls                          列出 provider
   qcs provider add <id> --base URL [--key K] [--name N] [--template T]
@@ -31,6 +34,11 @@ const usageText = `qcs - 在官方配置与自定义 provider 之间快速切换
   qcs use <agent> official                 切回官方 (同 restore)
   qcs diff <agent> <provider>/<model>|official   只看变更
   qcs restore <agent> [--yes] [--dry-run]  还原
+  qcs profile ls                           列出 profile (含内置 official)
+  qcs profile save <name>                  把各 Agent 当前选择存为 profile
+  qcs profile apply <name> [--yes] [--dry-run]
+  qcs profile rm <name>
+  qcs import [--add N|all] [--id ID]       发现 CC Switch / Codex / Claude 里已有的 provider 并导入
   qcs doctor [agent]                       检查漂移与常见问题
   qcs version
   qcs help
@@ -76,8 +84,7 @@ var errSilent = errors.New("failed")
 
 func (e *env) dispatch(args []string) error {
 	if len(args) == 0 {
-		fmt.Fprint(e.out, usageText)
-		return nil
+		return e.cmdGUI(nil)
 	}
 	cmd, rest := args[0], args[1:]
 	switch cmd {
@@ -87,6 +94,14 @@ func (e *env) dispatch(args []string) error {
 	case "version", "--version":
 		fmt.Fprintln(e.out, "qcs", Version)
 		return nil
+	case "gui":
+		return e.cmdGUI(rest)
+	case "web":
+		return e.cmdWeb(rest)
+	case "profile":
+		return e.cmdProfile(rest)
+	case "import":
+		return e.cmdImport(rest)
 	case "ls":
 		return e.cmdLs(rest)
 	case "provider":

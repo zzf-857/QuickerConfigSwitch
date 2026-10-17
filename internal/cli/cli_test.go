@@ -185,7 +185,7 @@ func TestUsageErrors(t *testing.T) {
 			t.Errorf("%v: code %d err %q", args, code, errs)
 		}
 	}
-	for _, args := range [][]string{{}, {"help"}, {"version"}, {"use", "-h"}, {"provider", "add", "-h"}} {
+	for _, args := range [][]string{{"help"}, {"version"}, {"use", "-h"}, {"provider", "add", "-h"}} {
 		if code, out, _ := run(t, "", args...); code != 0 || out == "" {
 			t.Errorf("%v: code %d", args, code)
 		}

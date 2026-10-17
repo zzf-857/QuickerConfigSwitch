@@ -74,12 +74,12 @@ func lineDiff(a, b []string) []diffLine {
 				out = append(out, diffLine{' ', ma[i]})
 				i++
 				j++
-			case j < m && (i == n || lcs[i][j+1] >= lcs[i+1][j]):
-				out = append(out, diffLine{'+', mb[j]})
-				j++
-			default:
+			case i < n && (j == m || lcs[i+1][j] >= lcs[i][j+1]):
 				out = append(out, diffLine{'-', ma[i]})
 				i++
+			default:
+				out = append(out, diffLine{'+', mb[j]})
+				j++
 			}
 		}
 	}

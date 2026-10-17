@@ -1,6 +1,7 @@
 package safekeep
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"sort"
@@ -57,13 +58,11 @@ func snapshot(agent, path string, b []byte, exists bool) (string, error) {
 }
 
 // rollingBackup copies the file as it is now before a write and keeps the
-// latest KeepBackups copies.
+// latest KeepBackups copies. A copy the same as the newest one is not
+// made again.
 func rollingBackup(agent, path string, b []byte) error {
 	dir := backupDir(agent, path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
-	if err := os.WriteFile(freeName(dir, "", ".bak", time.Now()), b, 0o600); err != nil {
 		return err
 	}
 	es, err := os.ReadDir(dir)
@@ -77,6 +76,17 @@ func rollingBackup(agent, path string, b []byte) error {
 		}
 	}
 	sort.Strings(baks)
+	// the same as the newest copy: one is enough
+	if n := len(baks); n > 0 {
+		if last, err := os.ReadFile(filepath.Join(dir, baks[n-1])); err == nil && bytes.Equal(last, b) {
+			return nil
+		}
+	}
+	name := freeName(dir, "", ".bak", time.Now())
+	if err := os.WriteFile(name, b, 0o600); err != nil {
+		return err
+	}
+	baks = append(baks, filepath.Base(name))
 	for len(baks) > KeepBackups {
 		os.Remove(filepath.Join(dir, baks[0]))
 		baks = baks[1:]

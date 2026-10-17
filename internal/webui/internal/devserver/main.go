@@ -8,12 +8,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/zzf-857/quickerconfigswitch/internal/core"
 	"github.com/zzf-857/quickerconfigswitch/internal/provider"
@@ -22,6 +26,13 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	addr := flag.String("addr", "127.0.0.1:8765", "listen address")
 	token := flag.String("token", "dev", "API token (\"\" for none)")
 	switched := flag.Bool("switched", false, "switch Codex to cpa/gpt-5.5 first")
@@ -66,8 +77,25 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+	control := core.NewRelayController()
+	defer control.Close()
+	srv := &http.Server{Addr: *addr, Handler: webui.Handler(webui.Options{Token: *token, Version: "dev", Relay: control}), ReadHeaderTimeout: 5 * time.Second}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	go func() {
+		<-ctx.Done()
+		control.Close()
+		shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdown); err != nil {
+			srv.Close()
+		}
+	}()
 	fmt.Printf("http://%s/?token=%s\n", *addr, *token)
-	log.Fatal(http.ListenAndServe(*addr, webui.Handler(webui.Options{Token: *token, Version: "dev"})))
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+	return nil
 }
 
 func must(err error) {

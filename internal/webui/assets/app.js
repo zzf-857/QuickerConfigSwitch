@@ -5,6 +5,7 @@ import { h, toast } from './ui.js';
 import { renderAgents } from './agents.js';
 import { renderProviders } from './providers.js';
 import { renderProfiles } from './profiles.js';
+import { deferRefresh, relayPolicy } from './logic.js';
 
 const TABS = [
   { id: 'agents', label: 'tabAgents', render: renderAgents },
@@ -18,20 +19,39 @@ export const app = {
   /** setState stores a fresh state from the server and redraws. */
   setState(st) {
     if (st) this.state = st;
+    stateVersion++;
+    pendingState = null;
     draw();
   },
-  async reload() {
+  async reload({ background = false } = {}) {
+    if (background && refreshing) return;
+    const version = stateVersion;
+    refreshing++;
     try {
-      this.setState(await api.state());
+      const st = await api.state();
+      // An action completed while this read was in flight; keep its newer state.
+      if (version !== stateVersion) return;
+      if (background && refreshDeferred()) pendingState = st;
+      else if (JSON.stringify(st) !== JSON.stringify(this.state)) this.setState(st);
       setBanner(null);
     } catch (e) {
       failBanner(e);
-    }
+    } finally { refreshing--; }
   },
   redraw() { draw(); },
 };
 
 let main; let banner; let footer; const tabButtons = {};
+let pendingState = null; let stateVersion = 0; let refreshing = 0;
+
+function refreshDeferred() {
+  const active = document.activeElement;
+  return deferRefresh(document.body.classList.contains('modal-open'), active?.tagName, active?.isContentEditable);
+}
+
+function flushRefresh() {
+  if (pendingState && !refreshDeferred()) app.setState(pendingState);
+}
 
 function setBanner(msg) {
   banner.hidden = !msg;
@@ -110,8 +130,16 @@ function init() {
 
   // Pick up changes made elsewhere (the CLI, another window) on return.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && !document.body.classList.contains('modal-open')) app.reload();
+    if (document.visibilityState === 'visible') app.reload({ background: true });
   });
+  window.addEventListener('focus', () => app.reload({ background: true }));
+  document.addEventListener('focusin', () => setTimeout(flushRefresh, 0));
+  document.addEventListener('focusout', () => setTimeout(flushRefresh, 0));
+  setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    flushRefresh();
+    if (relayPolicy((pendingState || app.state)?.relay).poll) app.reload({ background: true });
+  }, 3000);
   window.addEventListener('unhandledrejection', (e) => {
     toast(e.reason && e.reason.message ? e.reason.message : String(e.reason), 'error');
   });

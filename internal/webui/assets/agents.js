@@ -4,7 +4,8 @@ import { t } from './i18n.js';
 import { api } from './api.js';
 import { h, append, toast, errorToast, modal, diffView, reportView, busy } from './ui.js';
 import {
-  OFFICIAL, modelGroups, currentRef, fastChoice, findModel, buildRequest, reportHasLeft,
+  OFFICIAL, modelGroups, currentRef, currentModelLabel, fastChoice, findModel, buildRequest, reportHasLeft,
+  buildRelayRequest, relayPolicy,
 } from './logic.js';
 
 // What the user picked per agent, kept across redraws until a switch.
@@ -13,8 +14,14 @@ const picks = {};
 const doctorRuns = {};
 const outcomes = {};
 
-function pickFor(a) {
-  if (!picks[a.id]) picks[a.id] = { ref: currentRef(a), fast: fastChoice(a.fast), effort: a.effort || '' };
+function pickFor(a, relay) {
+  if (!picks[a.id]) {
+    const routing = a.id === 'codex' && relay?.provider && relay?.model;
+    picks[a.id] = {
+      ref: routing ? `${relay.provider}/${relay.model}` : currentRef(a),
+      fast: fastChoice(a.fast), effort: a.effort || '', mode: routing ? 'relay' : 'direct', all: !!relay?.all,
+    };
+  }
   return picks[a.id];
 }
 
@@ -31,8 +38,10 @@ function signInBadge(a) {
 }
 
 function currentLine(a) {
-  const off = a.mode === OFFICIAL || !a.provider;
+  const routing = a.mode === 'relay';
+  const off = !routing && (a.mode === OFFICIAL || !a.provider);
   const chips = [];
+  if (routing) chips.push(h('span', { class: 'chip' }, t('modeRelay')));
   if (!off) {
     if (a.fast === 'true') chips.push(h('span', { class: 'chip' }, 'Fast'));
     if (a.fast === 'false') chips.push(h('span', { class: 'chip chip-muted' }, `Fast ${t('off')}`));
@@ -40,7 +49,7 @@ function currentLine(a) {
   }
   return h('div', { class: 'current' },
     h('span', { class: 'label' }, t('current')),
-    h('strong', { class: off ? 'cur-official' : 'cur-provider' }, off ? t('official') : `${a.provider}/${a.model}`),
+    h('strong', { class: off ? 'cur-official' : 'cur-provider' }, off ? t('official') : currentModelLabel(a) || t('relayModelInCodex')),
     chips,
     a.managed ? h('span', { class: 'badge badge-warn-soft', title: t('managed') }, t('managed')) : null);
 }
@@ -53,10 +62,10 @@ function driftBox(a) {
       h('code', {}, d.path), d.slot ? h('code', {}, ` ${d.slot}`) : null, ` — ${t(`drift_${d.kind}`)}`))));
 }
 
-function modelSelect(app, a, pick, onChange) {
+function modelSelect(app, a, pick, onChange, disabled) {
   const groups = modelGroups(app.state.providers, a.id);
   const id = `model-${a.id}`;
-  const sel = h('select', { id, onchange: (e) => onChange(e.target.value) },
+  const sel = h('select', { id, disabled, onchange: (e) => onChange(e.target.value) },
     h('option', { value: OFFICIAL }, t('official')),
     groups.map((g) => h('optgroup', { label: g.provider.name },
       g.models.map((m) => h('option', { value: m.ref }, m.name === m.id ? m.id : `${m.name} (${m.id})`)))));
@@ -84,12 +93,12 @@ function fastControl(a, pick, disabled, onChange) {
     })));
 }
 
-function effortControl(app, a, pick, onChange) {
+function effortControl(app, a, pick, onChange, disabled) {
   const m = findModel(app.state.providers, pick.ref);
   const efforts = (m && m.efforts) || [];
   const id = `effort-${a.id}`;
   if (pick.effort && !efforts.includes(pick.effort)) pick.effort = '';
-  const sel = h('select', { id, disabled: !efforts.length, onchange: (e) => onChange(e.target.value) },
+  const sel = h('select', { id, disabled: disabled || !efforts.length, onchange: (e) => onChange(e.target.value) },
     h('option', { value: '' }, efforts.length ? t('keepAsIs') : '—'),
     efforts.map((e) => h('option', { value: e }, e)));
   sel.value = pick.effort;
@@ -156,12 +165,110 @@ async function runDoctor(app, a, btn) {
   } catch (e) { errorToast(e); }
 }
 
+async function previewAndStartRelay(app, pick, btn) {
+  const req = buildRelayRequest(pick.ref, pick.all);
+  if (!req) return;
+  let pv;
+  try { pv = await busy(btn, null, () => api.previewRelay(req)); }
+  catch (e) { errorToast(e); app.reload({ background: true }); return; }
+
+  let confirmed = false;
+  const body = h('div', { class: 'preview' },
+    h('div', { class: 'notice notice-info' }, t(pick.all ? 'relayAllHint' : 'relayMixedHint')),
+    h('p', {}, t('relayAddress'), ' ', h('code', {}, pv.url)),
+    pv.expiresAt ? h('small', { class: 'muted' }, t('relayExpires', { time: new Date(pv.expiresAt).toLocaleTimeString() })) : null,
+    pv.notice ? h('div', { class: 'notice notice-info' }, pv.notice) : null,
+    h('small', { class: 'muted legend' }, t('diffLegend')), diffView(pv.diff));
+  const cancel = h('button', { class: 'btn', onclick: () => m.close() }, t('cancel'));
+  const ok = h('button', { class: 'btn btn-primary' }, t('relayStart'));
+  ok.addEventListener('click', async () => {
+    // Preview IDs are single-use; a double click or failed response cannot replay one.
+    if (confirmed) return;
+    confirmed = true;
+    cancel.disabled = true;
+    try {
+      const res = await busy(ok, t('relayStarting'), () => api.startRelay(pv.id));
+      m.close();
+      delete picks.codex;
+      delete doctorRuns.codex;
+      delete outcomes.codex;
+      toast(t('relayStarted'));
+      app.setState(res.state);
+    } catch (e) {
+      m.close();
+      errorToast(e);
+      // A transport failure may leave the preview reserved. Cancel only its
+      // ID; if Start already succeeded this cannot stop the running relay.
+      try { await api.cancelRelay(pv.id); } catch { /* reload resolves the current owner */ }
+      app.reload({ background: true });
+    }
+  });
+  const m = modal({
+    title: t('relayPreviewTitle'), body, actions: [cancel, ok], wide: true,
+    onClose: async () => {
+      if (confirmed) return;
+      try {
+        const res = await api.cancelRelay(pv.id);
+        app.setState(res.state);
+      } catch (e) { errorToast(e); app.reload({ background: true }); }
+    },
+  });
+  app.reload({ background: true });
+}
+
+async function finishRelay(app, recover, btn) {
+  try {
+    const res = await busy(btn, null, () => recover ? api.recoverRelay() : api.stopRelay());
+    const report = res.result?.report;
+    const warn = reportHasLeft(report);
+    const text = t(recover ? 'relayRecovered' : 'relayStopped');
+    outcomes.codex = { text, report, warn };
+    delete picks.codex;
+    delete doctorRuns.codex;
+    toast(text, warn ? 'warn' : 'ok');
+    app.setState(res.state);
+  } catch (e) { errorToast(e); app.reload({ background: true }); }
+}
+
+function relayView(app) {
+  const relay = app.state.relay || {};
+  const policy = relayPolicy(relay);
+  const kind = ['stale', 'external'].includes(policy.state) ? 'warn' : ['error', 'unavailable', 'disabled'].includes(policy.state) ? 'error' : 'info';
+  const stop = policy.canStop ? h('button', { class: 'btn btn-small', onclick: () => finishRelay(app, false, stop) }, t('relayStop')) : null;
+  const recover = policy.canRecover ? h('button', { class: 'btn btn-small', onclick: () => finishRelay(app, true, recover) }, t('relayRecover')) : null;
+  return h('div', { class: `notice notice-${kind} relay-status`, role: 'status' },
+    h('strong', {}, t(`relay_${policy.state}`)),
+    relay.url ? h('div', {}, h('code', {}, relay.url)) : null,
+    relay.provider && relay.model ? h('div', {}, `${relay.provider}/${relay.model}`, ' · ', t(relay.all ? 'relayAll' : 'relayMixed')) : null,
+    relay.error ? h('div', { class: 'notice-text' }, relay.error) : null,
+    policy.state === 'external' ? h('p', {}, t('relayExternalHint')) : null,
+    policy.state === 'stale' ? h('p', {}, t('relayStaleHint')) : null,
+    policy.owned ? h('p', {}, t('relayOwnedHint')) : null,
+    stop || recover ? h('div', { class: 'actions' }, stop, recover) : null);
+}
+
+function modeControl(pick, disabled, onChange) {
+  const id = 'mode-codex';
+  const select = h('select', { id, disabled, onchange: (e) => onChange(e.target.value) },
+    h('option', { value: 'direct' }, t('modeDirect')),
+    h('option', { value: 'relay' }, t('modeRelay')));
+  select.value = pick.mode;
+  return h('div', { class: 'field' }, h('label', { for: id }, t('connectionMode')), select);
+}
+
 function agentCard(app, a) {
-  const pick = pickFor(a);
+  const codex = a.id === 'codex';
+  const policy = relayPolicy(app.state.relay);
+  const pick = pickFor(a, app.state.relay);
   const card = h('section', { class: 'card agent', 'aria-labelledby': `agent-${a.id}` });
   const redraw = () => card.replaceWith(agentCard(app, a));
   const isOff = pick.ref === OFFICIAL;
-  const switchBtn = h('button', { class: 'btn btn-primary', onclick: () => previewAndSwitch(app, a, pick, switchBtn) }, t('previewSwitch'));
+  const routing = codex && pick.mode === 'relay';
+  const locked = codex && policy.owned;
+  const switchBtn = h('button', {
+    class: 'btn btn-primary', disabled: locked || (routing && (!policy.canPreview || !buildRelayRequest(pick.ref, pick.all))),
+    onclick: () => routing ? previewAndStartRelay(app, pick, switchBtn) : previewAndSwitch(app, a, pick, switchBtn),
+  }, t(routing ? 'relayPreview' : 'previewSwitch'));
   const checkBtn = h('button', { class: 'btn', onclick: () => runDoctor(app, a, checkBtn) }, t('check'));
   append(card, [
     h('div', { class: 'card-head' },
@@ -170,12 +277,24 @@ function agentCard(app, a) {
     currentLine(a),
     a.detail ? h('div', { class: 'detail muted' }, a.detail) : null,
     a.error ? h('div', { class: 'notice notice-error' }, a.error) : null,
+    codex && policy.state !== 'idle' ? relayView(app) : null,
     driftBox(a),
     h('div', { class: 'controls' },
-      modelSelect(app, a, pick, (v) => { pick.ref = v; redraw(); focusLater(`model-${a.id}`); }),
+      codex ? modeControl(pick, locked, (v) => {
+        pick.mode = v;
+        if (v === 'relay' && pick.ref === OFFICIAL) pick.ref = modelGroups(app.state.providers, 'codex')[0]?.models[0]?.ref || OFFICIAL;
+        redraw(); focusLater('mode-codex');
+      }) : null,
+      modelSelect(app, a, pick, (v) => { pick.ref = v; redraw(); focusLater(`model-${a.id}`); }, locked),
+      routing ? [
+        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: pick.all, disabled: locked, onchange: (e) => { pick.all = e.target.checked; redraw(); } }), t('relayAll')),
+        h('small', { class: 'muted' }, t(pick.all ? 'relayAllHint' : 'relayMixedHint')),
+        h('small', { class: 'muted' }, t('relaySettingsHint')),
+        isOff ? h('small', { class: 'muted' }, t('relayChooseModel')) : null,
+      ] : null,
       h('div', { class: 'controls-row' },
-        a.id === 'codex' ? fastControl(a, pick, isOff, (v) => { pick.fast = v; }) : null,
-        effortControl(app, a, pick, (v) => { pick.effort = v; }))),
+        codex ? fastControl(a, pick, isOff || routing || locked, (v) => { pick.fast = v; }) : null,
+        effortControl(app, a, pick, (v) => { pick.effort = v; }, routing || locked))),
     h('div', { class: 'actions' }, switchBtn, checkBtn),
     outcomeView(outcomes[a.id]),
     doctorView(doctorRuns[a.id])]);

@@ -191,6 +191,13 @@ func ApplyProfile(name string) ([]ProfileStep, error) {
 	if err != nil {
 		return nil, err
 	}
+	return ApplyProfileSnapshot(p), nil
+}
+
+// ApplyProfileSnapshot applies the requests already inspected by a caller.
+// It does not reload a named profile, which could have changed between a
+// lifecycle guard and execution. Failures stay attached to their own step.
+func ApplyProfileSnapshot(p Profile) []ProfileStep {
 	var out []ProfileStep
 	for _, r := range p.Agents {
 		s := ProfileStep{Request: r}
@@ -201,5 +208,5 @@ func ApplyProfile(name string) ([]ProfileStep, error) {
 		}
 		out = append(out, s)
 	}
-	return out, nil
+	return out
 }

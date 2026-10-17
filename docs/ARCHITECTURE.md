@@ -308,7 +308,7 @@ openai_base_url = "http://127.0.0.1:17321/backend-api/codex"
 - 进程正常退出时删除 `openai_base_url`（magpie `EndCodexFailover` 的做法）；异常退出后，下次启动先修复。
 - 托盘常驻 + 可选开机自启；端口被占用时自动换端口并重写配置。
 
-当前实现使用 `qcs use codex <provider>/<model> --relay` 前台持有路由，托盘管理和开机自启留待后续。`core.PrepareRelay` 先获取进程锁、预留 loopback 端口并生成预览；用户确认后 `Start` 再检查配置和 provider 是否变化，交由 `safekeep.Apply` 写入。退出通过会话标记的条件还原，避免撤销其它进程后来做出的切换。异常退出释放系统文件锁，下一次启动可接管原有快照，也可显式执行 `qcs relay recover`。
+CLI 使用 `qcs use codex <provider>/<model> --relay` 前台持有路由；GUI/Web 和托盘由同一进程的 `core.RelayController` 管理。`core.PrepareRelay` 先获取进程锁、预留 loopback 端口并生成预览；用户确认后 `Start` 再检查配置和 provider 是否变化，交由 `safekeep.Apply` 写入。GUI/Web 返回预留会话的一次性确认 ID，取消或两分钟过期释放；Wails 同步退出钩子和 Web 服务停止均关闭控制器。退出通过会话标记的条件还原，避免撤销其它进程后来做出的切换。异常退出释放系统文件锁，下一次启动可接管原有快照，也可显式执行 `qcs relay recover`。
 
 路由不自动改变当前模型或 Fast 设置；并存模式将 `<provider>/<model>` 别名追加到官方目录，并在转发时去掉前缀。第三方请求采用独立的头部集合，不携带官方请求中的登录、账户或 cookie。HTTP/SSE 直接转发，不跟随上游重定向。运行中的路由不能通过普通方案保存或启动。
 

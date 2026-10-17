@@ -53,6 +53,11 @@ type relayProcess struct {
 
 func startRelayProcess(t *testing.T, home string) *relayProcess {
 	t.Helper()
+	return startCLIProcess(t, home, []string{"use", "codex", "cpa/cpa-gpt-alias", "--relay", "--port", "0", "--yes"}, "本地路由已启动: ", "/backend-api/codex")
+}
+
+func startCLIProcess(t *testing.T, home string, args []string, announcement, path string) *relayProcess {
+	t.Helper()
 	binary, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -62,8 +67,7 @@ func startRelayProcess(t *testing.T, home string) *relayProcess {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(binary, "-test.run=^TestRelayForegroundProcessHelper$", "-test.timeout=45s", "--",
-		"use", "codex", "cpa/cpa-gpt-alias", "--relay", "--port", "0", "--yes")
+	cmd := exec.Command(binary, append([]string{"-test.run=^TestRelayForegroundProcessHelper$", "-test.timeout=45s", "--"}, args...)...)
 	cmd.Env = append(os.Environ(), "QCS_E2E_RELAY_HOME="+home, "TMPDIR="+dir)
 	cmd.Stdout, cmd.Stderr = out, out
 	p := &relayProcess{cmd: cmd, done: make(chan struct{}), output: out.Name()}
@@ -101,12 +105,12 @@ func startRelayProcess(t *testing.T, home string) *relayProcess {
 			t.Fatalf("relay did not announce startup:\n%s", read(t, p.output))
 		case <-tick.C:
 			for _, line := range strings.Split(read(t, p.output), "\n") {
-				if !strings.HasPrefix(line, "本地路由已启动: ") {
+				if !strings.HasPrefix(line, announcement) {
 					continue
 				}
-				p.url = strings.TrimSpace(strings.TrimPrefix(line, "本地路由已启动: "))
+				p.url = strings.TrimSpace(strings.TrimPrefix(line, announcement))
 				u, err := url.Parse(p.url)
-				if err != nil || u.Scheme != "http" || u.Hostname() != "127.0.0.1" || u.Port() == "" || u.Port() == "0" || u.Path != "/backend-api/codex" {
+				if err != nil || u.Scheme != "http" || u.Hostname() != "127.0.0.1" || u.Port() == "" || u.Port() == "0" || u.Path != path {
 					t.Fatalf("invalid announced relay URL %q", p.url)
 				}
 				return p

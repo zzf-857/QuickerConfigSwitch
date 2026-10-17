@@ -30,6 +30,47 @@ test('refs and requests', () => {
   assert.equal(L.fastChoice(''), 'keep');
 });
 
+test('relay previews accept a third-party ref without changing Codex Fast or effort', () => {
+  assert.deepEqual(L.buildRelayRequest('cpa/openai/gpt-5', false), { provider: 'cpa', model: 'openai/gpt-5', all: false });
+  assert.deepEqual(L.buildRelayRequest('cpa/x', true), { provider: 'cpa', model: 'x', all: true });
+  for (const ref of [undefined, '', 'official', 'cpa', '/x', 'cpa/']) assert.equal(L.buildRelayRequest(ref, false), null);
+});
+
+test('relay current model stays separate from the third-party routing target', () => {
+  assert.equal(L.currentModelLabel({ mode: 'relay', provider: 'cpa', model: 'gpt-5.5' }), 'gpt-5.5');
+  assert.equal(L.currentModelLabel({ mode: 'relay', provider: 'cpa', model: 'cpa/gpt-5.5' }), 'cpa/gpt-5.5');
+  assert.equal(L.currentModelLabel({ mode: 'relay', provider: 'cpa' }), '');
+  assert.equal(L.currentModelLabel({ mode: 'direct', provider: 'cpa', model: 'gpt-5.5' }), 'cpa/gpt-5.5');
+  assert.equal(L.currentModelLabel({ mode: 'official' }), 'official');
+});
+
+test('relay actions distinguish ownership from external and stale sessions', () => {
+  assert.equal(L.relayPolicy().state, 'unavailable');
+  for (const state of ['idle', 'error']) assert.equal(L.relayPolicy({ state }).canPreview, true);
+  for (const state of ['preview', 'running']) {
+    const p = L.relayPolicy({ state });
+    assert.equal(p.owned, true);
+    assert.equal(p.poll, true);
+    assert.equal(p.canPreview, false);
+    assert.equal(p.canStop, state === 'running');
+  }
+  for (const state of ['external', 'stale', 'unavailable', 'disabled']) {
+    const p = L.relayPolicy({ state });
+    assert.equal(p.owned, false);
+    assert.equal(p.canPreview, false);
+    assert.equal(p.canStop, false);
+    assert.equal(p.canRecover, state === 'stale');
+  }
+});
+
+test('background state changes do not interrupt dialogs or editing controls', () => {
+  assert.equal(L.deferRefresh(true, 'BUTTON'), true);
+  for (const tag of ['INPUT', 'TEXTAREA', 'SELECT', 'input']) assert.equal(L.deferRefresh(false, tag), true);
+  assert.equal(L.deferRefresh(false, 'DIV', true), true);
+  assert.equal(L.deferRefresh(false, 'BUTTON'), false);
+  assert.equal(L.deferRefresh(false, undefined), false);
+});
+
 test('diffLines classifies lines', () => {
   const d = '--- a/x\n+++ b/x\n@@ -1 +1 @@\n ctx\n-old\n+new\n* write generated file x (3 bytes)\n';
   assert.deepEqual(L.diffLines(d).map((l) => l.kind), ['file', 'file', 'hunk', 'ctx', 'del', 'add', 'gen']);
@@ -84,6 +125,7 @@ test('i18n', () => {
   setLang('zh');
   assert.equal(t('switched', { agent: 'Codex', target: 'cpa/x' }), 'Codex 已切换到 cpa/x');
   for (const k of Object.keys(strings.en)) assert.ok(k in strings.zh, `en key ${k} has no zh`);
+  for (const k of Object.keys(strings.zh).filter((k) => k.startsWith('relay'))) assert.ok(k in strings.en, `relay key ${k} has no en`);
 });
 
 test('slot and path labels', () => {

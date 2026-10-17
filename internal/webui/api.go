@@ -21,6 +21,11 @@ func (s *server) routes(m *http.ServeMux) {
 	m.HandleFunc("POST /api/preview", s.locked(s.preview))
 	m.HandleFunc("POST /api/use", s.locked(s.use))
 	m.HandleFunc("GET /api/doctor", s.doctor)
+	m.HandleFunc("POST /api/relay/preview", s.locked(s.previewRelay))
+	m.HandleFunc("POST /api/relay/start", s.locked(s.startRelay))
+	m.HandleFunc("POST /api/relay/cancel", s.locked(s.cancelRelay))
+	m.HandleFunc("POST /api/relay/stop", s.locked(s.stopRelay))
+	m.HandleFunc("POST /api/relay/recover", s.locked(s.recoverRelay))
 
 	m.HandleFunc("GET /api/templates", s.templates)
 	m.HandleFunc("POST /api/providers", s.locked(s.addProvider))
@@ -78,6 +83,8 @@ func fail(w http.ResponseWriter, err error) {
 	switch {
 	case errors.As(err, &mbe):
 		status = http.StatusRequestEntityTooLarge
+	case errors.Is(err, core.ErrRelayBusy), errors.Is(err, core.ErrRelayRunning), errors.Is(err, core.ErrRelayClosed):
+		status = http.StatusConflict
 	case errors.Is(err, core.ErrUnknownAgent),
 		strings.Contains(msg, "not found"), strings.HasPrefix(msg, "no profile"):
 		status = http.StatusNotFound
@@ -168,10 +175,16 @@ type state struct {
 	Providers []providerView   `json:"providers"`
 	Profiles  []core.Profile   `json:"profiles"`
 	Version   string           `json:"version"`
+	Relay     core.RelayStatus `json:"relay"`
 }
 
 func (s *server) state() (state, error) {
 	st := state{Agents: core.Agents(), Version: s.o.Version}
+	st.Relay = core.RelayStatus{State: "unavailable"}
+	if s.o.Relay != nil {
+		st.Relay = s.o.Relay.Status()
+		st.Relay.Error = maskText(st.Relay.Error)
+	}
 	if st.Agents == nil {
 		st.Agents = []core.AgentView{}
 	}
@@ -232,7 +245,12 @@ func (s *server) use(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	res, err := core.Use(req)
+	var res core.Result
+	err := s.withRelayIdle(req.Agent == "codex", func() error {
+		var err error
+		res, err = core.Use(req)
+		return err
+	})
 	if err != nil {
 		fail(w, err)
 		return
@@ -448,7 +466,31 @@ func (s *server) previewProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) applyProfile(w http.ResponseWriter, r *http.Request) {
-	steps, err := core.ApplyProfile(r.PathValue("name"))
+	name := r.PathValue("name")
+	ps, err := core.Profiles()
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	hasCodex := false
+	var selected *core.Profile
+	for _, p := range ps {
+		if p.Name == name {
+			selected = &p
+			for _, req := range p.Agents {
+				hasCodex = hasCodex || req.Agent == "codex"
+			}
+		}
+	}
+	if selected == nil {
+		fail(w, fmt.Errorf("no profile %q", name))
+		return
+	}
+	var steps []core.ProfileStep
+	err = s.withRelayIdle(hasCodex, func() error {
+		steps = core.ApplyProfileSnapshot(*selected)
+		return nil
+	})
 	if err != nil {
 		fail(w, err)
 		return

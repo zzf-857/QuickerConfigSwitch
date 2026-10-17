@@ -261,6 +261,7 @@ fieldset[disabled] .seg-group label { cursor: default; }
 .notice-info { background: var(--info-soft); color: var(--text); }
 .notice-text { color: var(--text); margin-top: 4px; white-space: pre-wrap; }
 .notice code { font-size: 12px; }
+.relay-status { display: flex; flex-direction: column; gap: 6px; overflow-wrap: anywhere; }
 
 .problems { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .problem { padding: 6px 10px; border-radius: var(--radius-sm); background: var(--surface-2); }

@@ -52,6 +52,11 @@ export function currentRef(a) {
   return `${a.provider}/${a.model}`;
 }
 
+/** A relay preserves Codex's model; its provider is only a routing target. */
+export function currentModelLabel(a) {
+  return a?.mode === 'relay' ? (a.model || '') : currentRef(a);
+}
+
 /** fastValue maps the tri-state ("keep" | "on" | "off") to the request's fast. */
 export function fastValue(choice) {
   if (choice === 'on') return true;
@@ -75,6 +80,30 @@ export function buildRequest(agentID, ref, fast, effort) {
     if (effort) r.effort = effort;
   }
   return r;
+}
+
+/** buildRelayRequest keeps direct-mode Fast/Effort out of relay previews. */
+export function buildRelayRequest(ref, all) {
+  const r = parseRef(ref);
+  return r ? { ...r, all: !!all } : null;
+}
+
+/** relayPolicy exposes only actions owned by this process. */
+export function relayPolicy(relay) {
+  const state = relay?.state || 'unavailable';
+  const owned = state === 'preview' || state === 'running';
+  return {
+    state, owned,
+    canPreview: state === 'idle' || state === 'error',
+    canStop: state === 'running',
+    canRecover: state === 'stale',
+    poll: owned,
+  };
+}
+
+/** Background refreshes wait until dialogs and focused form fields are done. */
+export function deferRefresh(modalOpen, activeTag, contentEditable = false) {
+  return !!modalOpen || !!contentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(String(activeTag || '').toUpperCase());
 }
 
 /**

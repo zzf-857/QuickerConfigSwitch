@@ -16,6 +16,8 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/zzf-857/quickerconfigswitch/internal/core"
 )
 
 //go:embed assets
@@ -33,6 +35,9 @@ type Options struct {
 	// AllowOrigins are extra Origin values (scheme://host[:port]) accepted
 	// besides the server's own host, e.g. the desktop webview's scheme.
 	AllowOrigins []string
+	// Relay belongs to the serving process, shared by all its windows.
+	// The caller must Close it during shutdown. Nil disables relay controls.
+	Relay *core.RelayController
 }
 
 // CookieName is the cookie that carries Options.Token after the first page

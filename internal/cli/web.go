@@ -14,8 +14,10 @@ import (
 	"os/signal"
 	"runtime"
 	"strconv"
+	"syscall"
 	"time"
 
+	"github.com/zzf-857/quickerconfigswitch/internal/core"
 	"github.com/zzf-857/quickerconfigswitch/internal/gui"
 	"github.com/zzf-857/quickerconfigswitch/internal/webui"
 )
@@ -27,7 +29,7 @@ var (
 	openBrowser = defaultOpenBrowser
 	// webStop yields a channel closed when `qcs web` should stop.
 	webStop = func() (<-chan struct{}, func()) {
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		return ctx.Done(), cancel
 	}
 	webHandler = webui.Handler
@@ -65,7 +67,7 @@ func isLoopback(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-func (e *env) cmdWeb(args []string) error {
+func (e *env) cmdWeb(args []string) (retErr error) {
 	fs := flag.NewFlagSet("web", flag.ContinueOnError)
 	port := fs.Int("port", defaultWebPort, "端口 (0 = 任意空闲端口)")
 	host := fs.String("host", "127.0.0.1", "监听地址")
@@ -103,7 +105,20 @@ func (e *env) cmdWeb(args []string) error {
 		return err
 	}
 	token := hex.EncodeToString(raw[:])
-	srv := &http.Server{Handler: webHandler(webui.Options{Token: token}), ReadHeaderTimeout: 10 * time.Second}
+	control := core.NewRelayController()
+	srv := &http.Server{Handler: webHandler(webui.Options{Token: token, Relay: control}), ReadHeaderTimeout: 10 * time.Second}
+	defer func() {
+		// Reject new relay operations before draining HTTP requests; a
+		// request already in flight cannot recreate a relay during exit.
+		retErr = errors.Join(retErr, control.Close())
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			retErr = errors.Join(retErr, srv.Close())
+		}
+	}()
+	stop, cancel := webStop()
+	defer cancel()
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
 
@@ -119,8 +134,6 @@ func (e *env) cmdWeb(args []string) error {
 		}
 	}
 
-	stop, cancel := webStop()
-	defer cancel()
 	select {
 	case <-stop:
 	case err := <-done:
@@ -128,9 +141,6 @@ func (e *env) cmdWeb(args []string) error {
 			return err
 		}
 	}
-	ctx, c := context.WithTimeout(context.Background(), 3*time.Second)
-	defer c()
-	_ = srv.Shutdown(ctx)
 	fmt.Fprintln(e.out, "已停止。")
 	return nil
 }

@@ -5,7 +5,7 @@
 
 ## 1. 一句话现状
 
-第一阶段（CLI 核心）和第二阶段（图形界面、方案、导入）已完成。第三阶段已实现**模式 R 的前台路由与 CLI 生命周期**，包括异常退出后重启接管、显式恢复、端口回退；托盘管理路由和开机自启尚未接入。切回官方后的 provider 密钥残留也已修复。真实用户机器上的验收仍未完成，不能把本地假后端测试视为真实 Codex/CPA 验收。
+CLI 核心、图形界面、方案和导入已完成；模式 R 现支持 **CLI、GUI/Web 和托盘生命周期管理**。接下来的阶段是可选择的开机自启。切回官方后的 provider 密钥残留已修复。具体阶段与验证见 [STAGES.md](STAGES.md)。真实用户机器上的验收仍未完成，不能把本地假后端测试视为真实 Codex/CPA 验收。
 
 ## 2. 已完成的功能
 
@@ -25,6 +25,7 @@
 | 切回官方时保留 provider 定义、撤销 qcs 写入的密钥；原有值和用户改动保留 | `qcs use codex official` / `qcs restore codex` | clean/dirty、旧记录迁移、重复切换、预览回归 |
 | 官方与第三方并存 / 全走第三方的前台路由 | `qcs use codex cpa/gpt-5.5 --relay [--relay-all]` | 本地假后端、SSE、压缩请求、凭据隔离 |
 | 路由退出还原、异常重启、手动恢复、端口占用回退 | `qcs relay recover` / 再次运行 `--relay` | 生命周期及进程信号测试 |
+| GUI/Web 路由预览、确认、停止、恢复和所有者状态；托盘停止/恢复 | Codex 卡片「本地路由」 / 托盘菜单 | 控制器/API race、Web SIGTERM、真实后端 Chromium、GTK 编译与原生窗口启动 |
 
 ## 3. 构建与测试
 
@@ -48,14 +49,16 @@ make cli
 - 所有测试通过 `internal/testenv` 把 HOME 等指向临时目录，**不会碰真实配置**。新增测试包必须加 `func TestMain(m *testing.M) { testenv.Main(m) }`。
 - 界面开发服务器：`go run ./internal/webui/internal/devserver -addr 127.0.0.1:8765 -token dev [-switched]`（用临时 home 和假数据）。
 - 当前云环境的完整 Go 依赖已缓存并通过 `go mod verify`。SQLite/libc 首次下载受网络重定向限制，已从官方 GitLab 源码生成与 `go.sum` 完全一致的模块归档；辅助工具及归档在 `/workspace/.qcs-tools`。复建若再次下载受阻，需要环境允许 `storage.googleapis.com`。
-- 路由测试只访问本地假后端；桌面 GUI、真实 ChatGPT 登录与 CPA Fast 未在本次云环境验收。
+- 路由测试只访问本地假后端；真实 ChatGPT 登录与 CPA Fast、原生桌面完整交互未在本次云环境验收。
+- 云环境额外准备了 rootless GTK/WebKit 前缀：先激活 Go，再 `source /workspace/.qcs-tools/gtk/activate.sh`，可运行 `make build` 和 `go test -tags gtk3 ./...`。原生启动用 `/workspace/.qcs-tools/gtk/run-native.sh <GUI命令>` 映射 WebKit 的编译时子进程路径；依赖来自经过 APT 签名/校验和验证的 Debian 包。详细用法见该目录 README；普通开发机直接安装 README 中的系统包即可。
 
-本次续作验证结果：
+阶段 A 的验证记录（后续阶段结果见 STAGES.md）：
 
 - `go test -race -p 4 -tags nogui ./...`：16 个有测试的包通过，269 个顶层测试通过；2 个按条件跳过（当前用户没有第二个组，及只供子进程调用的文件锁 helper）。含子用例共 803 条通过记录。
 - `go vet -tags nogui ./...`、`go mod verify`、前端 9 项测试、Linux `make cli` 均通过。
 - Windows amd64、macOS arm64 的 `nogui` 交叉编译通过；这不代表原生 GUI 或真机运行验收。
 - Web fixture HTTP 冒烟通过：页面、授权状态查询、未授权 401、切换预览。Unix 子进程测试验证 SIGTERM、SIGKILL、重启恢复和登录文件不变。
+- 阶段 B：新增控制器/鉴权 API/进程级检查，前端现在 15 项测试；真实后端 Chromium 验证全部预览关闭路径、单次确认、网络失败释放、停止还原、方案守护和编辑保护。GTK3 原生窗口在 Xvfb 下启动；实际托盘宿主与真实账号仍待验收。
 
 ## 4. 代码地图
 
@@ -64,6 +67,7 @@ cmd/qcs                 入口
 internal/cli            命令行（ls/provider/use/diff/restore/doctor/profile/import/web/gui）
 internal/core           GUI、web、CLI 共用的门面：Agents/PreviewUse/Use/Doctor/方案/Redact
                        relay.go 管理前台路由的预览、进程锁、启动、退出和恢复
+                       relay_control.go 管理 GUI/Web 共享所有权、预览过期与关闭
 internal/relay          Codex 官方 / 第三方 HTTP 路由、模型目录合并、SSE、压缩请求
 internal/webui          JSON API + 内嵌页面（assets/ 下原生 JS，无构建步骤）
 internal/gui            Wails 桌面壳（!nogui）；nogui.go 为无界面构建
@@ -86,6 +90,7 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - `plan.Op.Keep`：还原时保留（Codex 的 `[model_providers.qcs-*]` 表，旧会话重新打开要用）。
 - `plan.Op.RestoreKeys`：Keep 表中仍须撤销的键，当前用于 `experimental_bearer_token`；按键记录原值与最后写入值，用户改过的值不动。旧状态迁移只处理仍有明确写入记录的 qcs 表。
 - `safekeep.RestoreIfState`：锁内校验会话标记后还原；路由退出不能撤销另一个进程后来的切换。Apply/Restore 在配置文件和状态记录任一写入失败时一起回滚。
+- GUI/Web 的 `core.RelayController` 由宿主进程创建并负责 Close；Handler 不隐式创建生命周期。Wails `OnShutdown` 必须同步清理，单用 defer 在部分平台无效。路由预览返回一次性 ID，确认只用该 ID；关闭/超时不能保留进程锁。
 - 数据目录：`appdir.Dir()`（可用 `QCS_HOME` 覆盖）下的 `providers.json`、`profiles.json`、`state/stash.json`、`state/applied.json`、`backups/`、`codex/catalog-*.json`。
 
 ## 5. 已知问题与待办（按优先级）
@@ -100,7 +105,8 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - 已完成：`/models` 合并官方列表和 `<provider>/<model>` 别名；`/responses`、`/responses/compact` 分流，保持 `service_tier` 和流式响应；WebSocket 回 426。
 - 已完成：官方请求的凭据和请求体透传；第三方只使用明确配置的头部与 provider key，移除官方查询参数，不允许第三方重定向绕过路由。支持 Codex 的 zstd 压缩请求并限制解压后的大小。
 - 已完成：`core.PrepareRelay` 预览并持有进程锁，`Start` 重新校验后写入，退出按会话标记还原；默认端口占用时回退；异常退出后重启接管或 `qcs relay recover`。运行中的路由暂不能保存为普通方案。
-- 后续：GUI/托盘中管理路由生命周期及状态、跨平台开机自启、真实 Codex/CPA 验收（含压缩请求和 426 后 HTTP 回退）。不要将 CLI 进程直接启动后立即退出，否则配置会随清理还原。
+- 已完成：GUI/Web/托盘的共享路由控制器和生命周期；主窗口关闭只隐藏，退出应用会还原；Web 服务关闭会还原，关浏览器标签不会停止已经运行的路由。预览两分钟后自动释放。
+- 后续：跨平台开机自启、真实 Codex/CPA 验收（含压缩请求和 426 后 HTTP 回退）。不要将 CLI 进程直接启动后立即退出，否则配置会随清理还原。
 
 **其他待办**
 - 界面没有"编辑方案"功能（`PUT /api/profiles/{name}` 已有，前端未调用）；没有"测试连接"按钮。

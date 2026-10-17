@@ -3,7 +3,7 @@
 import { t } from './i18n.js';
 import { api } from './api.js';
 import { h, toast, errorToast, modal, confirmDialog, diffView, reportView, busy } from './ui.js';
-import { OFFICIAL, profileSummary, stepsFailed } from './logic.js';
+import { OFFICIAL, profileSummary, stepsFailed, relayPolicy } from './logic.js';
 
 const ui = { saving: false, name: '' };
 
@@ -79,7 +79,8 @@ async function removeProfile(app, p) {
 
 function profileCard(app, p) {
   const builtIn = p.name === OFFICIAL;
-  const applyBtn = h('button', { class: 'btn btn-small btn-primary', onclick: () => applyFlow(app, p, applyBtn) }, t('apply'));
+  const blocked = relayPolicy(app.state.relay).owned && (builtIn || (p.agents || []).some((r) => r.agent === 'codex'));
+  const applyBtn = h('button', { class: 'btn btn-small btn-primary', disabled: blocked, title: blocked ? t('relayProfileHint') : null, onclick: () => applyFlow(app, p, applyBtn) }, t('apply'));
   const rows = profileSummary(p);
   return h('section', { class: 'card profile', 'aria-label': displayName(p) },
     h('div', { class: 'card-head' },
@@ -96,9 +97,10 @@ function profileCard(app, p) {
 }
 
 function saveBar(app) {
+  const blocked = relayPolicy(app.state.relay).owned;
   if (!ui.saving) {
     return h('button', {
-      class: 'btn btn-primary', id: 'save-profile',
+      class: 'btn btn-primary', id: 'save-profile', disabled: blocked, title: blocked ? t('relayProfileHint') : null,
       onclick: () => { ui.saving = true; app.redraw(); requestAnimationFrame(() => document.getElementById('profile-name')?.focus()); },
     }, t('saveCurrent'));
   }
@@ -110,7 +112,7 @@ function saveBar(app) {
       if (e.key === 'Escape') { e.preventDefault(); cancel(); }
     },
   });
-  const saveBtn = h('button', { class: 'btn btn-primary', onclick: () => save() }, t('save'));
+  const saveBtn = h('button', { class: 'btn btn-primary', disabled: blocked, onclick: () => save() }, t('save'));
   const cancel = () => { ui.saving = false; ui.name = ''; app.redraw(); requestAnimationFrame(() => document.getElementById('save-profile')?.focus()); };
   const save = async () => {
     const name = ui.name.trim();
@@ -129,5 +131,6 @@ export function renderProfiles(app) {
   const ps = app.state.profiles || [];
   return h('div', { class: 'view' },
     h('div', { class: 'view-head' }, h('div', {}, h('h1', {}, t('profilesTitle')), h('p', { class: 'muted small' }, t('profilesHint'))), saveBar(app)),
+    relayPolicy(app.state.relay).owned ? h('div', { class: 'notice notice-info' }, t('relayProfileHint')) : null,
     h('div', { class: 'grid' }, ps.map((p) => profileCard(app, p))));
 }

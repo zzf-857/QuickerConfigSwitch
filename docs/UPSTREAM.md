@@ -23,6 +23,7 @@
 | `internal/desktopapp`、Codex Detect（阶段 F） | `internal/agent/desktopapp.go`、`desktopapp_windows.go` 与身份测试 | 只提取 Codex bundle/Store 身份及有限安装目录；测试隔离真实应用目录和注册表 |
 | `internal/agent/codex/proxy.go`（阶段 F） | `internal/agent/codex_proxy.go`、`codex_proxy_test.go` | 复制 reqwest 环境变量/NO_PROXY 匹配及回归；不引入 login shell、系统代理或修改代理配置 |
 | 显式请求头子表支持（阶段 F） | `internal/agent/codex_headers_table_test.go`、`internal/edit/toml.go` 的 Inline→子表合并 | safekeep 拆分子表所有权、迁移旧 inline 记录；新增小型 quoted-key 编辑入口复用原语；新文件 0600 在调用层处理 |
+| `internal/agent/claude`（阶段 G） | `internal/agent/claude.go` 的 cloudSwitches、writeTiers/dropAbout、claudeName/claudeEffortsFor/effort 字段；`internal/provider/claudedash.go` | 提取云/别名/能力清理和 effort 规则；直连没有网关反向映射，保留精确 ID；加认证隔离、原有上限及管理员冲突检查 |
 
 Magpie 的配置适配器与网关不是直接整包复制的目标：它们还包含账户、路由组、
 后台守护进程和自动重启等本项目暂不需要的功能。只提取当前配置切换所需部分。
@@ -40,6 +41,9 @@ Magpie 的配置适配器与网关不是直接整包复制的目标：它们还�
   的 Check；现代独立 profile 配置层仍由客户端启动方式决定。
 - 不移植完整账户额度耗尽检测或 API 状态回退；保留官方登录模式仍受客户端本身的
   认证/额度行为影响。实际合同与核验边界见 REQUIREMENTS.md。
+- Claude CLI 的新行为还用官方 npm 分发的 2.1.302 实际请求核对，分发归档经过其
+  SHA512 integrity 校验。空 token 会回退官方 OAuth、X-Api-Key-only 不阻止附带 OAuth，
+  直连需第三方 token 或明确 Authorization；这与 Magpie 自有网关负责隔离的边界不同。
 
 ## 接手时的操作
 

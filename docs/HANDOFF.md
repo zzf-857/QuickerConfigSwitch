@@ -5,7 +5,7 @@
 
 ## 1. 一句话现状
 
-CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、GUI/Web 和托盘生命周期管理**，并复用了 Magpie 的可选登录自启、目录回退与命名空间检查。阶段 A–F 已完成并经测试，具体记录见 [STAGES.md](STAGES.md)，复用映射见 [UPSTREAM.md](UPSTREAM.md)。保留活动官方登录且所有模型请求走 CPA，应使用「本地路由 + 全走上游」。官方 Codex CLI 0.159.2 已用隔离配置验证目录及 Fast 档位；真实用户桌面、账号与 CPA 的最终验收仍未完成，不能以本地测试替代。
+CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、GUI/Web 和托盘生命周期管理**，并复用了 Magpie 的可选登录自启、目录回退与命名空间检查。阶段 A–G 已完成并经测试，具体记录见 [STAGES.md](STAGES.md)，复用映射见 [UPSTREAM.md](UPSTREAM.md)。保留活动官方登录且所有模型请求走 CPA，应使用「本地路由 + 全走上游」。官方 Codex CLI 0.159.2 已用隔离配置验证目录及 Fast 档位；真实用户桌面、账号与 CPA 的最终验收仍未完成，不能以本地测试替代。
 
 ## 2. 已完成的功能
 
@@ -63,6 +63,8 @@ make cli
 - 阶段 C：GTK3 全量 race/vet/桌面构建通过，前端 18 项；当前用户自启的 CLI/API 与浏览器流程仅在临时 HOME 中测试，Windows 使用假注册表。系统 GLib 验证转义与参数，Windows GUI/macOS CLI 交叉编译通过。真实登录与系统策略待验收。
 - 阶段 D：GTK3/`nogui` 全量 race、vet、模块校验、前端 18 项、Linux 桌面与 Windows GUI/macOS CLI 构建通过；GTK3 17 个有测试的包、318 个顶层测试通过，2 项条件跳过。只读缓存回退、取消/超时分离、未知前缀和认证头还原回归覆盖已加入。
 - 阶段 E：补齐 provider 未拉取模型时的 Fast 默认、原有自定义目录切换/还原、旧版活动 profile 冲突保护、获取不到状态锁时零写入。新增组合测试覆盖活动官方登录、全走 CPA、Fast 和凭据隔离；详见 REQUIREMENTS.md 与 STAGES.md。
+- 阶段 F：Codex 认证覆盖与静态/动态旧认证头冲突保护、显式请求头子表还原/漂移及旧记录迁移；桌面身份识别、loopback 代理诊断和新文件私有创建。原有缺省权限不被更改。
+- 阶段 G：Claude CLI 补齐云/子代理/后台模型/元数据、精确 ID、自定义请求头和显式 effort/上限；拒绝空认证导致官方 OAuth 传到第三方的路径。官方 CLI 2.1.302 六项临时本地请求检查通过。
 
 ## 4. 代码地图
 
@@ -97,6 +99,7 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - `safekeep.RestoreIfState`：锁内校验会话标记后还原；路由退出不能撤销另一个进程后来的切换。Apply/Restore 在配置文件和状态记录任一写入失败时一起回滚。
 - `safekeep.lockAll`：获取不到跨进程锁时必须返回错误；不能忽略 Magpie 通用锁原语的 held=false。直连旧版活动 profile 若覆盖计划则拒绝；现代独立 `--profile` 配置层需由客户端启动方式确认。
 - 新配置在写入密钥前设为 0600，已有配置权限保留；含还原时重建保留 provider 表的路径。Codex 直连拒绝已有 qcs provider 的冲突认证，不静默删用户键；桌面检测按应用身份区分 Codex 与同名 ChatGPT 聊天端。loopback 代理诊断仅覆盖当前进程环境。
+- `written.DeletedKeys` 只记录已明确拥有的键级删除，用于旧 inline→请求头子表迁移时恢复原先被覆盖删除的头；不能把缺失的任意键猜成 qcs 删除。Windows 的新文件权限依赖用户目录继承的 ACL，Unix 的 0600 检查不代替 Windows ACL 验收。
 - 模型列表为空时用已有 `provider.DefaultFast` 补齐临时模型能力，显式 Fast=false 仍保留。直连若已有自定义目录则改指向 provider 目录，不编辑原文件；后续切换可能继续使用生成目录，直到还原时恢复原指向。
 - GUI/Web 的 `core.RelayController` 由宿主进程创建并负责 Close；Handler 不隐式创建生命周期。Wails `OnShutdown` 必须同步清理，单用 defer 在部分平台无效。路由预览返回一次性 ID，确认只用该 ID；关闭/超时不能保留进程锁。
 - 数据目录：`appdir.Dir()`（可用 `QCS_HOME` 覆盖）下的 `providers.json`、`profiles.json`、`state/stash.json`、`state/applied.json`、`backups/`、`codex/catalog-*.json`。

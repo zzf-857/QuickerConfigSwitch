@@ -6,6 +6,10 @@
 
 核心要求与实现证据见 REQUIREMENTS.md。官方 Codex CLI 0.159.2 已在隔离配置下通过
 app-server 严格加载及模型列表/Fast 检查；这仍不代表真实桌面账号或远端 CPA 验收。
+官方 Claude CLI 2.1.302 已通过临时配置与 loopback SSE 的六项实际请求检查，覆盖
+ID、认证、effort 及上限；可用
+`python3 scripts/check_claude_contract.py --qcs ./qcs --claude /path/to/claude`
+重跑。两个脚本都不访问真实账户或远端模型。
 有官方客户端时，可用 Python 3.11+ 运行
 `python3 scripts/check_codex_contract.py --qcs ./qcs --codex /path/to/codex`
 重做临时配置检查；该脚本不进行登录或推理。

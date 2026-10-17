@@ -95,6 +95,22 @@
   旧记录迁移、点号键、写密钥前权限、失败占位文件清理。Windows 检测测试交叉编译通过。
 - 边界：代理诊断不读取桌面登录 shell 或平台系统代理；实际应用/Store 和代理仍待真机验收。
 
+## 阶段 G：Claude CLI 单一配置与认证/模型细节（已完成）
+
+- 对照 Magpie 的云开关、writeTiers/dropAbout、原生模型努力档位，补齐六种云开关、
+  small-fast、普通/workflow 子代理和过期模型说明清理；按原值/漂移安全还原。
+- 直连保留 provider 的精确模型 ID，不照搬依赖网关反向转换的 dashed 写法。
+- 支持明确配置的自定义头，隔离原认证头；拒绝可能回退到官方 OAuth 的空认证，
+  原登录文件不读不写。预览整段遮盖 `ANTHROPIC_CUSTOM_HEADERS`，含旧凭据及转义值。
+- 显式 effort 不再静默忽略：验证客户端/模型能力及原有 maxEffortLevel，保留所有
+  上限。dotted Claude ID 的显式 effort 不能可靠生效时拒绝，不擅自改 ID。
+- 管理员字段冲突时报错；下层 global/shell 的云/模型/认证覆盖使用临时值遮蔽并还原。
+- 验证：Claude/core/webui/e2e/CLI race 及相关 vet，通过官方 Claude CLI 2.1.302
+  的六项实际本地 SSE 请求检查：精确 ID、原生/自定义/max effort、header-only
+  Authorization 及原有 effort 上限；配置逐字节恢复，登录文件内容/身份/时间/权限保持。
+- 可重跑 `scripts/check_claude_contract.py --qcs ./qcs --claude /path/to/claude`，
+  需要 Python 3.11+；只用临时配置、假令牌及 loopback 后端，不访问真实账户或远端模型。
+
 ## 后续验收与优化
 
 - 三平台真实 Codex/CPA 切换、Fast、HTTP 回退、托盘面板和登录自启。

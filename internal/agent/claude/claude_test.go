@@ -68,10 +68,12 @@ func TestPlanDirect(t *testing.T) {
 	want := map[string]string{
 		"env.ANTHROPIC_BASE_URL":             "http://127.0.0.1:8317",
 		"env.ANTHROPIC_AUTH_TOKEN":           "sk-test",
-		"env.ANTHROPIC_DEFAULT_OPUS_MODEL":   "claude-opus-4-6",
-		"env.ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-opus-4-6",
-		"env.ANTHROPIC_DEFAULT_HAIKU_MODEL":  "claude-opus-4-6",
-		"model":                              "claude-opus-4-6",
+		"env.ANTHROPIC_CUSTOM_HEADERS":       "",
+		"env.ANTHROPIC_DEFAULT_OPUS_MODEL":   "claude-opus-4.6",
+		"env.ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-opus-4.6",
+		"env.ANTHROPIC_DEFAULT_HAIKU_MODEL":  "claude-opus-4.6",
+		"env.ANTHROPIC_SMALL_FAST_MODEL":     "claude-opus-4.6",
+		"model":                              "claude-opus-4.6",
 	}
 	for k, v := range want {
 		if got := o["set-json "+k].Value; got != v {
@@ -89,17 +91,17 @@ func TestPlanDirect(t *testing.T) {
 	}
 }
 
-func TestSpelled(t *testing.T) {
+func TestNativeNameDoesNotChangeIDs(t *testing.T) {
 	for in, want := range map[string]string{
 		"claude-opus-4.6":      "claude-opus-4-6",
 		"claude-sonnet-4.5":    "claude-sonnet-4-5",
 		"claude-opus-4-6":      "claude-opus-4-6",
-		"gpt-5.1":              "gpt-5.1",
-		"deepseek-v3.2":        "deepseek-v3.2",
-		"claude-haiku-4.5[1m]": "claude-haiku-4-5[1m]",
+		"gpt-5.1":              "",
+		"deepseek-v3.2":        "",
+		"claude-haiku-4.5[1m]": "claude-haiku-4-5",
 	} {
-		if got := Spelled(in); got != want {
-			t.Errorf("Spelled(%q) = %q, want %q", in, got, want)
+		if got := claudeName(in); got != want {
+			t.Errorf("claudeName(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
@@ -163,7 +165,7 @@ func TestCurrent(t *testing.T) {
 
 	addProv(t, "cpa", "http://127.0.0.1:8317", "claude-opus-4.6")
 	must(t, os.MkdirAll(appdir.ClaudeHome(), 0o755))
-	must(t, os.WriteFile(settingsPath(), []byte(`{"model":"claude-opus-4-6","env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:8317/"}}`), 0o644))
+	must(t, os.WriteFile(settingsPath(), []byte(`{"model":"claude-opus-4.6","env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:8317/"}}`), 0o644))
 	st, _ = c.Current()
 	if st.Mode != agent.Direct || st.Provider != "cpa" || st.Model != "claude-opus-4.6" {
 		t.Errorf("managed: %+v", st)

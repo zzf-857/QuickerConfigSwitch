@@ -13,8 +13,12 @@ import (
 // every stored provider secret, any quoted value of a key-like name, and
 // anything shaped like an "sk-" key.
 var (
-	secretAssign = regexp.MustCompile(`(?i)((?:token|key|secret|auth\w*|password|bearer)"?\s*[=:]\s*")([^"\\\n]{4,})(")`)
-	skLike       = regexp.MustCompile(`\bsk-[A-Za-z0-9_\-]{8,}`)
+	// Claude's custom-header string can contain several old credentials,
+	// including JSON escapes and values not in our provider store. Hide the
+	// entire string rather than guessing which header names contain secrets.
+	customHeadersAssign = regexp.MustCompile(`(?i)("?ANTHROPIC_CUSTOM_HEADERS"?\s*[=:]\s*)("(?:[^"\\\r\n]|\\.)*")`)
+	secretAssign        = regexp.MustCompile(`(?i)((?:token|key|secret|auth\w*|password|bearer)"?\s*[=:]\s*")([^"\\\n]{4,})(")`)
+	skLike              = regexp.MustCompile(`\bsk-[A-Za-z0-9_\-]{8,}`)
 )
 
 // Redact masks API keys in text shown to the user: previews, notices and
@@ -23,6 +27,13 @@ func Redact(s string) string {
 	if s == "" {
 		return s
 	}
+	s = customHeadersAssign.ReplaceAllStringFunc(s, func(m string) string {
+		g := customHeadersAssign.FindStringSubmatch(m)
+		if g[2] == `""` {
+			return m
+		}
+		return g[1] + `"****"`
+	})
 	if ps, err := provider.List(); err == nil {
 		for _, p := range ps {
 			if len(p.APIKey) >= 4 {

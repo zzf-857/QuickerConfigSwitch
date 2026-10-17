@@ -287,7 +287,7 @@ func TestClaudeToCPAAndBack(t *testing.T) {
 	use(t, cl, agent.Target{Mode: agent.Direct, Provider: "cpa", Model: "claude-opus-4.6"})
 
 	s := read(t, st)
-	for _, want := range []string{`"ANTHROPIC_BASE_URL": "http://127.0.0.1:8317"`, `"claude-opus-4-6"`, `"theme": "dark"`, `// my settings`, `"DISABLE_TELEMETRY"`} {
+	for _, want := range []string{`"ANTHROPIC_BASE_URL": "http://127.0.0.1:8317"`, `"claude-opus-4.6"`, `"theme": "dark"`, `// my settings`, `"DISABLE_TELEMETRY"`} {
 		if !bytes.Contains([]byte(s), []byte(want)) {
 			t.Fatalf("settings.json lacks %s:\n%s", want, s)
 		}

@@ -23,3 +23,7 @@ Parts of this project are adapted from third-party code:
   internal/agent/desktopapp.go, desktopapp_windows.go, codex_proxy.go and tests at
   7660399a121af67db4efd56ecb6bd4fb04dc53f1, Copyright (c) 2026 yetone,
   MIT License — see third_party/magpie/LICENSE and docs/UPSTREAM.md.
+- Claude CLI cloud/tier/effort rules under internal/agent/claude are adapted
+  from yetone/magpie internal/agent/claude.go at
+  7660399a121af67db4efd56ecb6bd4fb04dc53f1, Copyright (c) 2026 yetone,
+  MIT License — see third_party/magpie/LICENSE and docs/UPSTREAM.md.

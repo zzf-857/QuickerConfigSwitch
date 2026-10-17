@@ -49,6 +49,10 @@ type Op struct {
 	// added it: Codex's [model_providers.qcs-*] table, which threads
 	// started on it need to be reopened.
 	Keep bool `json:"keep,omitempty"`
+	// RestoreKeys are exceptions to Keep for a merging SetTable: when
+	// the table or these keys are no longer desired, they get their originals
+	// back if they still hold our values. The table stays for old threads.
+	RestoreKeys []string `json:"restore_keys,omitempty"`
 }
 
 // FileEdit is every change to one file.

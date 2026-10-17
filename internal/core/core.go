@@ -71,10 +71,11 @@ func View(a agent.Agent) AgentView {
 
 // Request is a switch the user asked for.
 type Request struct {
-	Agent  string `json:"agent"`
-	Ref    string `json:"ref"`              // "<provider>/<model>" or "official"
-	Fast   *bool  `json:"fast,omitempty"`   // nil leaves the user's own choice alone
-	Effort string `json:"effort,omitempty"` // "" leaves it alone
+	Agent  string     `json:"agent"`
+	Ref    string     `json:"ref"`              // "<provider>/<model>" or "official"
+	Fast   *bool      `json:"fast,omitempty"`   // nil leaves the user's own choice alone
+	Effort string     `json:"effort,omitempty"` // "" leaves it alone
+	Mode   agent.Mode `json:"mode,omitempty"`   // relay needs a foreground owner, not an ordinary switch
 }
 
 // Preview is what a switch would change, written nowhere.
@@ -104,6 +105,9 @@ func lookup(id string) (agent.Agent, error) {
 // planFor is the adapter's plan for r, with the choices it doesn't record
 // itself put in its state (profiles read them back).
 func planFor(r Request) (*plan.Plan, error) {
+	if r.Mode != "" && r.Mode != agent.Direct {
+		return nil, errors.New("relay needs a foreground process; use qcs use codex <provider>/<model> --relay")
+	}
 	a, err := lookup(r.Agent)
 	if err != nil {
 		return nil, err
@@ -196,6 +200,9 @@ func Current(id string) Request {
 	}
 	s := safekeep.State(id)
 	r := Request{Agent: id, Ref: s["provider"] + "/" + s["model"], Effort: s["effort"]}
+	if s["mode"] == string(agent.Relay) {
+		r.Mode = agent.Relay
+	}
 	if s["provider"] == "" || s["model"] == "" {
 		r.Ref = Official
 	}

@@ -31,6 +31,9 @@ const usageText = `qcs - 在官方配置与自定义 provider 之间快速切换
   qcs provider models <id> [--fetch] [--add m1,m2] [--rm m] [--fast m=true|false]
   qcs provider templates                   可用模板
   qcs use <agent> <provider>/<model> [--fast|--no-fast] [--effort E] [--yes] [--dry-run]
+  qcs use codex <provider>/<model> --relay [--relay-all] [--port N] [--yes] [--dry-run]
+                                           前台路由，停止后还原配置
+  qcs relay recover                        异常退出后还原路由配置
   qcs use <agent> official                 切回官方 (同 restore)
   qcs diff <agent> <provider>/<model>|official   只看变更
   qcs restore <agent> [--yes] [--dry-run]  还原
@@ -98,6 +101,8 @@ func (e *env) dispatch(args []string) error {
 		return e.cmdGUI(rest)
 	case "web":
 		return e.cmdWeb(rest)
+	case "relay":
+		return e.cmdRelay(rest)
 	case "profile":
 		return e.cmdProfile(rest)
 	case "import":

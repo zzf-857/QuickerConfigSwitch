@@ -85,6 +85,24 @@ func TestGetTOMLRaw(t *testing.T) {
 	}
 }
 
+func TestTOMLKeyRawRecordedText(t *testing.T) {
+	for name, variant := range rawVariants() {
+		t.Run(name, func(t *testing.T) {
+			raw := variant("[provider]\ntoken = '''line one\nline two''' # comment\nother = [1, 2]\n")
+			got, ok, err := TOMLKeyRaw(raw, "provider", "token")
+			if err != nil || !ok || got != "'''line one\nline two'''" {
+				t.Fatalf("raw token was not preserved: %q %v %v", got, ok, err)
+			}
+			if _, ok, err := TOMLKeyRaw(raw, "provider", "missing"); err != nil || ok {
+				t.Fatalf("missing key: %v %v", ok, err)
+			}
+		})
+	}
+	if _, _, err := TOMLKeyRaw("[provider]\ntoken = 'unterminated", "provider", "token"); err == nil {
+		t.Fatal("invalid recorded TOML treated as a missing key")
+	}
+}
+
 // What is read raw and put back leaves the file byte for byte as it was,
 // whatever its line ends and byte order mark.
 func TestRawRoundTrip(t *testing.T) {

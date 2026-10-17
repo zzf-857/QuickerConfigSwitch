@@ -12,7 +12,7 @@
 ## 当前进度
 
 - 已完成：CLI 核心（Codex / Claude Code 的「官方 / 直连」切换、备份还原、漂移检测）、桌面版（托盘 + 窗口）、浏览器版 `qcs web`、方案、从 CC Switch 等导入。
-- 未开始：保留官方订阅的本地路由（模式 R）。
+- 已实现：模式 R 的前台本地路由（官方与第三方并存、全走第三方、退出还原及异常退出恢复）。托盘内管理路由和开机自启尚未接入。
 - 交接说明见 [docs/HANDOFF.md](docs/HANDOFF.md)。
 
 ## 构建
@@ -48,7 +48,26 @@ qcs doctor                                 # 检查冲突与漂移
 
 - 重启 Codex 桌面端（或新开 CLI 会话）生效；
 - 桌面端只显示在这个 provider 上开的会话，ChatGPT 登录态功能暂不可用；切回官方即恢复；
-- `[model_providers.qcs-<id>]` 表在切回官方后会保留，以便重新打开在它上面开过的会话。
+- `[model_providers.qcs-<id>]` 表在切回官方后会保留，以便加载旧会话；qcs 写入的密钥会撤销，原来已有的密钥还原，被用户另行修改的值保留。再次使用该 provider 时重新切换即可写入当前密钥。
+
+## 保留官方登录的本地路由
+
+先配置一个支持 Responses 的 provider，然后在终端运行：
+
+```sh
+qcs use codex official                      # 如果此前启用了直连，先还原
+qcs use codex cpa/gpt-5.5 --relay             # 预览、确认后前台运行
+qcs use codex cpa/gpt-5.5 --relay --relay-all # 所有模型请求都发给 CPA
+qcs relay recover                           # 异常退出后只恢复配置
+```
+
+保持终端中的路由进程运行，重启 Codex，再在模型选择器里选择 `cpa/gpt-5.5`。默认并存模式下，原有官方模型仍走官方订阅，带 `cpa/` 前缀的模型走 CPA。`--relay-all` 也将没有前缀的模型发给 CPA，需要上游支持对应模型。
+
+路由只改 `openai_base_url`，保留 `model_provider`、当前模型、Fast 和推理强度；在 Codex 内调整这些选择。已有自定义 `model_catalog_json` 或活动 profile 中覆盖路由配置的字段时，会提示先处理冲突。CLI 路由不接受 `--fast`、`--no-fast`、`--effort`。
+
+Ctrl+C 或 SIGTERM 会停止路由并还原原来的地址。异常退出后，重新执行 `--relay` 会接管旧记录并更换为可用端口，也可以用 `qcs relay recover` 还原；随后重启 Codex。默认端口 17321 被占用时自动选择空闲端口，`--port 0` 可显式选择随机端口。路由只监听本机，不支持 WebSocket，返回 426 以请求客户端使用 HTTP。
+
+当前路由入口在 CLI，运行中的路由不能保存为方案。官方登录、真实上游 Fast 和桌面端仍需要用户机器验收；自动测试使用本地假后端，不需要真实密钥。
 
 ## 许可
 

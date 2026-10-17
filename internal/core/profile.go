@@ -77,7 +77,11 @@ func SaveProfile(name string) (Profile, error) {
 	p := Profile{Name: name}
 	for _, a := range agent.All() {
 		if a.Detect().Installed || safekeep.Touched(a.ID()) {
-			p.Agents = append(p.Agents, Current(a.ID()))
+			r := Current(a.ID())
+			if r.Mode == agent.Relay {
+				return Profile{}, fmt.Errorf("%s uses a foreground relay; stop it before saving a profile", a.ID())
+			}
+			p.Agents = append(p.Agents, r)
 		}
 	}
 	return p, putProfile(p)
@@ -89,6 +93,9 @@ func PutProfile(p Profile) error {
 		return err
 	}
 	for _, r := range p.Agents {
+		if r.Mode != "" && r.Mode != agent.Direct {
+			return fmt.Errorf("profiles cannot start foreground relay processes")
+		}
 		if _, err := lookup(r.Agent); err != nil {
 			return err
 		}

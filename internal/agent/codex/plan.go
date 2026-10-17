@@ -15,9 +15,6 @@ import (
 	"github.com/zzf-857/quickerconfigswitch/internal/provider"
 )
 
-// ErrRelayUnavailable is Plan's answer for Relay until the relay exists.
-var ErrRelayUnavailable = errors.New("codex: relay mode is not available yet")
-
 // Plan computes the edits for t. It is the whole set of changes: what an
 // earlier plan wrote and this one leaves out (model_catalog_json,
 // service_tier, model_reasoning_effort) is put back by the executor.
@@ -28,7 +25,7 @@ func (c *Codex) Plan(t agent.Target) (*plan.Plan, error) {
 	switch t.Mode {
 	case agent.Direct:
 	case agent.Relay:
-		return nil, ErrRelayUnavailable
+		return c.relayPlan(t)
 	case agent.Official:
 		return nil, errors.New("codex: official is a restore, not a plan")
 	default:
@@ -122,7 +119,10 @@ func (c *Codex) Plan(t agent.Target) (*plan.Plan, error) {
 	if t.Effort != "" {
 		set("model_reasoning_effort", t.Effort)
 	}
-	top = append(top, plan.Op{Kind: plan.SetTable, Table: "model_providers." + table, KVs: tableKVs(p), Keep: true})
+	top = append(top, plan.Op{
+		Kind: plan.SetTable, Table: "model_providers." + table, KVs: tableKVs(p), Keep: true,
+		RestoreKeys: []string{"experimental_bearer_token"},
+	})
 	// the catalog first: config.toml names it
 	edits = append(edits, plan.FileEdit{Path: path, Format: plan.TOML, Ops: top})
 

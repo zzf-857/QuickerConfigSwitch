@@ -1,11 +1,11 @@
 # 交接文档
 
-> 截至 2026-10-17。分支 `claude/exciting-galileo-cgd4uk`，所有改动已推送。
-> 先读：[README.md](../README.md)（用法）→ [ARCHITECTURE.md](ARCHITECTURE.md)（设计与 Codex 源码分析）→ 本文。
+> 截至 2026-10-17。后续工作按阶段验证并提交；阶段状态见 [STAGES.md](STAGES.md)，具体提交见 Git 历史。原交接分支为 `claude/exciting-galileo-cgd4uk`。
+> 接手顺序：[AGENTS.md](../AGENTS.md)（开发规范）→ [README.md](../README.md)（用法）→ 本文与 [STAGES.md](STAGES.md)（状态/下一步）→ [ARCHITECTURE.md](ARCHITECTURE.md)（设计细节）。
 
 ## 1. 一句话现状
 
-第一阶段（CLI 核心）和第二阶段（图形界面、方案、导入）**已完成并通过全部测试**。第三阶段（保留官方订阅的本地路由，即"模式 R"）**尚未开始**。全部功能**还没在真实用户机器上试过**，只在测试和虚拟显示器里验证过。
+第一阶段（CLI 核心）和第二阶段（图形界面、方案、导入）已完成。第三阶段已实现**模式 R 的前台路由与 CLI 生命周期**，包括异常退出后重启接管、显式恢复、端口回退；托盘管理路由和开机自启尚未接入。切回官方后的 provider 密钥残留也已修复。真实用户机器上的验收仍未完成，不能把本地假后端测试视为真实 Codex/CPA 验收。
 
 ## 2. 已完成的功能
 
@@ -22,6 +22,9 @@
 | 从 CC Switch（SQLite/旧版 config.json）、Codex config.toml、Claude settings 导入 provider（只读） | `qcs import`、界面 Providers 页底部 | 单元（真实 SQLite 夹具） |
 | 桌面版：Wails v3 托盘 + 小面板（`/?mode=panel`）+ 主窗口 | `qcs` 或 `qcs gui [--hidden]` | 在 Xvfb 下真实启动、截图 |
 | 浏览器版：本地 HTTP + 随机令牌 + Origin/Host 校验 | `qcs web` | 单元 + Playwright 截图 |
+| 切回官方时保留 provider 定义、撤销 qcs 写入的密钥；原有值和用户改动保留 | `qcs use codex official` / `qcs restore codex` | clean/dirty、旧记录迁移、重复切换、预览回归 |
+| 官方与第三方并存 / 全走第三方的前台路由 | `qcs use codex cpa/gpt-5.5 --relay [--relay-all]` | 本地假后端、SSE、压缩请求、凭据隔离 |
+| 路由退出还原、异常重启、手动恢复、端口占用回退 | `qcs relay recover` / 再次运行 `--relay` | 生命周期及进程信号测试 |
 
 ## 3. 构建与测试
 
@@ -30,6 +33,13 @@ make test        # = go test -tags gtk3 ./...（Linux 必须带 gtk3 标签，�
 make build       # 带 GUI 的 qcs
 make cli         # -tags nogui，纯 CLI + qcs web，可交叉编译
 node --test internal/webui/assets/*.test.mjs   # 前端纯函数测试
+
+# 无 GTK/WebKit 的云环境：
+source /workspace/.qcs-tools/activate.sh # 此云环境的 Go 1.26；其它环境用已安装的 Go
+umask 022                              # readonly fixture 测试要求普通创建权限
+go test -tags nogui ./...
+go vet -tags nogui ./...
+make cli
 ```
 
 - Go 1.26（go.mod 要求；旧 Go 会自动下载工具链）。
@@ -37,6 +47,15 @@ node --test internal/webui/assets/*.test.mjs   # 前端纯函数测试
 - macOS / Windows 的 GUI 需要在本机原生编译（CGO）；只验证过 `nogui` 交叉编译和 Windows 的 GUI 编译。
 - 所有测试通过 `internal/testenv` 把 HOME 等指向临时目录，**不会碰真实配置**。新增测试包必须加 `func TestMain(m *testing.M) { testenv.Main(m) }`。
 - 界面开发服务器：`go run ./internal/webui/internal/devserver -addr 127.0.0.1:8765 -token dev [-switched]`（用临时 home 和假数据）。
+- 当前云环境的完整 Go 依赖已缓存并通过 `go mod verify`。SQLite/libc 首次下载受网络重定向限制，已从官方 GitLab 源码生成与 `go.sum` 完全一致的模块归档；辅助工具及归档在 `/workspace/.qcs-tools`。复建若再次下载受阻，需要环境允许 `storage.googleapis.com`。
+- 路由测试只访问本地假后端；桌面 GUI、真实 ChatGPT 登录与 CPA Fast 未在本次云环境验收。
+
+本次续作验证结果：
+
+- `go test -race -p 4 -tags nogui ./...`：16 个有测试的包通过，269 个顶层测试通过；2 个按条件跳过（当前用户没有第二个组，及只供子进程调用的文件锁 helper）。含子用例共 803 条通过记录。
+- `go vet -tags nogui ./...`、`go mod verify`、前端 9 项测试、Linux `make cli` 均通过。
+- Windows amd64、macOS arm64 的 `nogui` 交叉编译通过；这不代表原生 GUI 或真机运行验收。
+- Web fixture HTTP 冒烟通过：页面、授权状态查询、未授权 401、切换预览。Unix 子进程测试验证 SIGTERM、SIGKILL、重启恢复和登录文件不变。
 
 ## 4. 代码地图
 
@@ -44,6 +63,8 @@ node --test internal/webui/assets/*.test.mjs   # 前端纯函数测试
 cmd/qcs                 入口
 internal/cli            命令行（ls/provider/use/diff/restore/doctor/profile/import/web/gui）
 internal/core           GUI、web、CLI 共用的门面：Agents/PreviewUse/Use/Doctor/方案/Redact
+                       relay.go 管理前台路由的预览、进程锁、启动、退出和恢复
+internal/relay          Codex 官方 / 第三方 HTTP 路由、模型目录合并、SSE、压缩请求
 internal/webui          JSON API + 内嵌页面（assets/ 下原生 JS，无构建步骤）
 internal/gui            Wails 桌面壳（!nogui）；nogui.go 为无界面构建
 internal/agent          Agent 接口与注册表
@@ -63,20 +84,23 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - **适配器永远不写文件**，只返回 `plan.Plan`；写入、备份、还原全部由 `safekeep` 负责。
 - `safekeep.Apply` 的语义是"本次计划是该 Agent 的**全部**期望状态"：上次写过、这次没写的键会还原。
 - `plan.Op.Keep`：还原时保留（Codex 的 `[model_providers.qcs-*]` 表，旧会话重新打开要用）。
+- `plan.Op.RestoreKeys`：Keep 表中仍须撤销的键，当前用于 `experimental_bearer_token`；按键记录原值与最后写入值，用户改过的值不动。旧状态迁移只处理仍有明确写入记录的 qcs 表。
+- `safekeep.RestoreIfState`：锁内校验会话标记后还原；路由退出不能撤销另一个进程后来的切换。Apply/Restore 在配置文件和状态记录任一写入失败时一起回滚。
 - 数据目录：`appdir.Dir()`（可用 `QCS_HOME` 覆盖）下的 `providers.json`、`profiles.json`、`state/stash.json`、`state/applied.json`、`backups/`、`codex/catalog-*.json`。
 
 ## 5. 已知问题与待办（按优先级）
 
 **需要尽快做**
 1. **在真实机器上验收**：macOS / Windows / Linux 各装一次，用真实 Codex 桌面端 + CPA 走一遍「切换 → /fast 可用 → 切回」。目前只验证了生成的配置符合 Codex 源码，没跑过真实 Codex。
-2. **切回官方后 provider 表里留着明文 key**（因为 Keep）。考虑：还原时只删 `experimental_bearer_token`、或提供"彻底清除"选项。
+2. **旧版本已还原且丢失管理记录的残留 key**：新的撤销逻辑和旧状态迁移已经实现，但不能仅凭 `qcs-*` 表名前缀删除无记录的值。若要提供彻底清理，需另做可预览、用户明确选择的流程。provider 数据和历史备份仍按原设计保存；本次修复不是整盘密钥擦除。
 3. **托盘相关行为未实测**：点击切换面板、失焦隐藏、二次启动唤起主窗口、macOS 无 Dock 图标。Xvfb 里没有托盘宿主，只验证了主窗口能显示。
 
-**第三阶段：模式 R（本地路由）** —— 设计见 ARCHITECTURE §2.5、§4.8
-- 只写 `openai_base_url = http://127.0.0.1:<port>/backend-api/codex`，ChatGPT 登录、历史会话、桌面端功能都保留。
-- 新包 `internal/relay`：`/models` 合并官方列表 + 自定义模型条目（用 `codexcat` 生成）；`/responses` 按模型分流（官方原样透传 chatgpt.com，自定义改 key 转发 CPA，`service_tier` 保留）；WebSocket 回 426；退出时删掉 `openai_base_url`。
-- Codex 适配器的 `Plan` 目前对 `agent.Relay` 返回 `ErrRelayUnavailable`，从这里接入。
-- magpie 的参考实现：`internal/gateway/codex_backend.go`、`internal/agent/codex.go` 的 `EndCodexFailover`。
+**第三阶段：模式 R（已完成的 CLI 范围与后续）** —— 设计见 ARCHITECTURE §2.5、§4.8
+- 已完成：只写 `openai_base_url`；保留官方 provider、登录文件、模型/Fast/推理选择。已有直连、显式模型目录、活动 profile 覆盖时拒绝并说明冲突。
+- 已完成：`/models` 合并官方列表和 `<provider>/<model>` 别名；`/responses`、`/responses/compact` 分流，保持 `service_tier` 和流式响应；WebSocket 回 426。
+- 已完成：官方请求的凭据和请求体透传；第三方只使用明确配置的头部与 provider key，移除官方查询参数，不允许第三方重定向绕过路由。支持 Codex 的 zstd 压缩请求并限制解压后的大小。
+- 已完成：`core.PrepareRelay` 预览并持有进程锁，`Start` 重新校验后写入，退出按会话标记还原；默认端口占用时回退；异常退出后重启接管或 `qcs relay recover`。运行中的路由暂不能保存为普通方案。
+- 后续：GUI/托盘中管理路由生命周期及状态、跨平台开机自启、真实 Codex/CPA 验收（含压缩请求和 426 后 HTTP 回退）。不要将 CLI 进程直接启动后立即退出，否则配置会随清理还原。
 
 **其他待办**
 - 界面没有"编辑方案"功能（`PUT /api/profiles/{name}` 已有，前端未调用）；没有"测试连接"按钮。

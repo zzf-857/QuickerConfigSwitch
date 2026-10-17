@@ -1,6 +1,6 @@
 # QuickerConfigSwitch 架构设计
 
-> 状态：设计稿（v0.1，2026-10-17）。尚未开始编码。
+> 状态：设计基线（2026-10-17）。O/D、GUI/Web 和模式 R 的前台路由已实现；实际进度及验收边界见 [HANDOFF.md](HANDOFF.md)。
 > 参考：[yetone/magpie](https://github.com/yetone/magpie)（MIT）、[openai/codex](https://github.com/openai/codex) 源码、[router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)（下文简称 CPA）源码。
 
 ## 0. 一句话定位
@@ -86,7 +86,7 @@ CC Switch 的 Codex 供应商同时保存 `auth`（即 `auth.json` 内容，第�
 | 官方模型 | ✅ | 走 CPA（"全走 CPA"） | 子模式「并存」：官方模型走 ChatGPT，自定义模型走 CPA；子模式「全走 CPA」：全部走 CPA |
 | Fast | ✅ | ✅：GPT 系列用内置目录；其它模型由我们生成 `model_catalog_json` 并带 `service_tiers` | ✅：官方模型用后端给的档位；自定义模型由路由生成的目录带档位 |
 | 依赖 | 无 | 无 | 本地路由进程必须在跑（关闭时自动去掉 `openai_base_url`） |
-| 切回官方 | — | 删 `model_provider`/`model_catalog_json`，还原 `model`；**保留 provider 表**（旧线程要用） | 删 `openai_base_url`（若用户原来有，还原原值） |
+| 切回官方 | — | 删 `model_provider`/`model_catalog_json`，还原 `model`；**保留 provider 定义，撤销 qcs 写入的密钥**（旧线程要用） | 删 `openai_base_url`（若用户原来有，还原原值） |
 
 用户的两个诉求对应关系：
 
@@ -308,9 +308,15 @@ openai_base_url = "http://127.0.0.1:17321/backend-api/codex"
 - 进程正常退出时删除 `openai_base_url`（magpie `EndCodexFailover` 的做法）；异常退出后，下次启动先修复。
 - 托盘常驻 + 可选开机自启；端口被占用时自动换端口并重写配置。
 
+当前实现使用 `qcs use codex <provider>/<model> --relay` 前台持有路由，托盘管理和开机自启留待后续。`core.PrepareRelay` 先获取进程锁、预留 loopback 端口并生成预览；用户确认后 `Start` 再检查配置和 provider 是否变化，交由 `safekeep.Apply` 写入。退出通过会话标记的条件还原，避免撤销其它进程后来做出的切换。异常退出释放系统文件锁，下一次启动可接管原有快照，也可显式执行 `qcs relay recover`。
+
+路由不自动改变当前模型或 Fast 设置；并存模式将 `<provider>/<model>` 别名追加到官方目录，并在转发时去掉前缀。第三方请求采用独立的头部集合，不携带官方请求中的登录、账户或 cookie。HTTP/SSE 直接转发，不跟随上游重定向。运行中的路由不能通过普通方案保存或启动。
+
+Codex 在官方 provider + ChatGPT 登录时默认启用 zstd 请求压缩（`codex-rs/core/src/client.rs` 的 `responses_request_compression`）。路由对压缩前后正文都设大小限制，解压读取模型；官方请求继续使用原始压缩字节，第三方请求使用去前缀后的 JSON 并移除编码头。第三方查询参数不透传，3xx 返回 502，避免客户端绕过路由向新地址转发账户头。
+
 ### 4.9 GUI 与 CLI
 
-- **GUI**：Wails v3（托盘 + 主窗口，与 magpie 相同），前端用 Vite 构建后 `go:embed` 进二进制。三个页面：
+- **GUI**：Wails v3（托盘 + 主窗口，与 magpie 相同），前端为原生 JavaScript 模块，通过 `go:embed` 进二进制，无单独构建步骤。三个页面：
   - **Agents**：每个 Agent 一行，显示"官方 / provider/model / 模式 / 漂移状态"，下拉切换，切换前弹 diff。
   - **Providers**：增删改、拉取模型、勾选 Fast、测试连通性。
   - **方案（Profiles）**：把所有 Agent 当前的选择存成一个名字，一键切换；"官方"是内置方案。

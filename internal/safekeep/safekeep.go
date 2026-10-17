@@ -57,8 +57,10 @@
 // file removed when it did not exist) and Keep slots that did not exist
 // originally are added again. Otherwise each slot still holding what we
 // wrote gets its original back, one the user changed since is left and
-// listed in Report.Left, and Keep slots stay. A file this tool created
-// that ends up holding nothing (whitespace, {}) is removed. Then the
+// listed in Report.Left, and Keep slots stay except for their RestoreKeys.
+// Those keys are restored individually, preserving later user edits.
+// A file this tool created that ends up holding nothing (whitespace, {})
+// is removed. Then the
 // agent's records are forgotten.
 //
 // Slots of one file are expected not to overlap (a SetTable and a
@@ -70,6 +72,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -141,24 +144,26 @@ func Apply(p *plan.Plan) error {
 	if err != nil {
 		return err
 	}
-	if _, err := e.sync(jobs, false); err != nil {
-		return err
-	}
-	a := e.appliedAgent()
-	a.State = nil
-	if len(p.State) > 0 {
-		a.State = map[string]string{}
-		for k, v := range p.State {
-			a.State[k] = v
+	return edit.Atomically(func() error {
+		if _, err := e.sync(jobs, false); err != nil {
+			return err
 		}
-	}
-	s.prune(p.Agent)
-	// applied first: a stash entry it no longer names is dropped later,
-	// while an applied slot without its original could not be put back
-	if err := s.saveApplied(); err != nil {
-		return err
-	}
-	return s.saveStash()
+		a := e.appliedAgent()
+		a.State = nil
+		if len(p.State) > 0 {
+			a.State = map[string]string{}
+			for k, v := range p.State {
+				a.State[k] = v
+			}
+		}
+		s.prune(p.Agent)
+		// applied first: a stash entry it no longer names is dropped later,
+		// while an applied slot without its original could not be put back
+		if err := s.saveApplied(); err != nil {
+			return err
+		}
+		return s.saveStash()
+	}, transactionPaths(jobs)...)
 }
 
 // Preview is the unified diff of what Apply(p) would do, writing nothing:
@@ -179,21 +184,64 @@ func Restore(agent string) (*Report, error) {
 	if err != nil {
 		return nil, err
 	}
+	return restoreLoaded(agent, s)
+}
+
+// RestoreIfState restores only while the recorded state still has this
+// value. The comparison and restore share the process and file locks,
+// so a departing session cannot undo a newer selection. A mismatch
+// returns (nil, nil).
+func RestoreIfState(agent, key, value string) (*Report, error) {
+	unlock := lockAll()
+	defer unlock()
+	s, err := load()
+	if err != nil {
+		return nil, err
+	}
+	a := s.applied.Agents[agent]
+	if a == nil {
+		return nil, nil
+	}
+	if got, ok := a.State[key]; !ok || got != value {
+		return nil, nil
+	}
+	return restoreLoaded(agent, s)
+}
+
+func restoreLoaded(agent string, s *state) (*Report, error) {
 	e := &engine{agent: agent, s: s}
 	jobs, err := e.jobs(&plan.Plan{Agent: agent})
 	if err != nil {
 		return nil, err
 	}
-	rep, err := e.sync(jobs, true)
+	var rep *Report
+	err = edit.Atomically(func() error {
+		var err error
+		rep, err = e.sync(jobs, true)
+		if err != nil {
+			return err
+		}
+		delete(s.applied.Agents, agent)
+		delete(s.stash.Agents, agent)
+		if err := s.saveApplied(); err != nil {
+			return err
+		}
+		return s.saveStash()
+	}, transactionPaths(jobs)...)
 	if err != nil {
 		return nil, err
 	}
-	delete(s.applied.Agents, agent)
-	delete(s.stash.Agents, agent)
-	if err := s.saveApplied(); err != nil {
-		return nil, err
+	return rep, nil
+}
+
+// A failed record write must undo config writes too: otherwise a relay
+// could be left configured with no saved state to restore it on exit.
+func transactionPaths(jobs []*job) []string {
+	paths := make([]string, 0, len(jobs)+2)
+	for _, j := range jobs {
+		paths = append(paths, j.real)
 	}
-	return rep, s.saveStash()
+	return append(paths, appliedPath(), stashPath())
 }
 
 // RestorePreview is the unified diff of what Restore(agent) would do.
@@ -400,6 +448,9 @@ func (e *engine) jobs(p *plan.Plan) ([]*job, error) {
 			return nil, fmt.Errorf("%s: edited as both %s and %s", path, j.format, fe.Format)
 		}
 		for _, op := range fe.Ops {
+			if len(op.RestoreKeys) > 0 && (op.Kind != plan.SetTable || !op.Keep || op.Whole) {
+				return nil, fmt.Errorf("%s: RestoreKeys needs a kept merging SetTable", path)
+			}
 			sl, err := slotOf(fe.Format, op)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", path, err)
@@ -473,11 +524,17 @@ func (e *engine) sync(jobs []*job, restore bool) (*Report, error) {
 		if fa := a.Files[j.real]; fa != nil && fa.Hash != hashOf(cur, exists) {
 			fa.Dirty = true
 		}
+		if err := seedRestoreKeys(fs, a.Files[j.real]); err != nil {
+			return nil, fmt.Errorf("%s: recorded table: %w", j.real, err)
+		}
 		for _, sl := range j.slots {
 			if fs.Slots[sl.ID()] == nil {
 				o := capture(w, sl)
 				fs.Slots[sl.ID()] = &o
 			}
+		}
+		for i, op := range j.ops {
+			captureRestoreKeys(w, op, fs.Slots[j.slots[i].ID()])
 		}
 	}
 	if !e.dry {
@@ -528,21 +585,33 @@ func (e *engine) syncFile(j *job, restore bool) (*FileResult, error) {
 	}
 	res := &FileResult{Path: j.real}
 	var revert, keep []string
+	var keys []*Original
+	retiring := map[string][]string{}
 	keepWhole := false // a Keep whole file can't be written again from its hash
 	if fa != nil {
 		for _, id := range sortedKeys(fa.Slots) {
-			if _, ok := desired[id]; ok {
+			wr := fa.Slots[id]
+			if i, ok := desired[id]; ok {
+				next := ownedRestoreKeys(j.ops[i])
+				for _, key := range wr.RestoreKeys {
+					if !slices.Contains(next, key) {
+						retiring[id] = append(retiring[id], key)
+					}
+				}
+				keys = append(keys, keptKeyRestores(w, fs, wr, retiring[id], res)...)
 				continue
 			}
 			if fa.Slots[id].Keep {
 				keep = append(keep, id)
 				keepWhole = keepWhole || fa.Slots[id].Kind == WholeFile
+				retiring[id] = slices.Clone(wr.RestoreKeys)
+				keys = append(keys, keptKeyRestores(w, fs, wr, retiring[id], res)...)
 			} else {
 				revert = append(revert, id)
 			}
 		}
 	}
-	touch := len(j.ops) > 0 || len(revert) > 0
+	touch := len(j.ops) > 0 || len(revert) > 0 || len(keys) > 0
 	if touch && exists && !e.dry {
 		if err := rollingBackup(e.agent, j.real, cur); err != nil {
 			return nil, fmt.Errorf("backup of %s: %w", j.real, err)
@@ -585,7 +654,26 @@ func (e *engine) syncFile(j *job, restore bool) (*FileResult, error) {
 			res.Reverted = append(res.Reverted, id)
 		}
 	}
+	for _, o := range keys {
+		if err := putOriginal(w, o); err != nil {
+			return nil, err
+		}
+		res.Reverted = append(res.Reverted, o.ID())
+	}
 	res.Kept = keep
+	// Retire key ownership after it has been restored or left to the
+	// user. Refresh kept table records so a later rebase cannot bring a
+	// removed credential back.
+	for id, retired := range retiring {
+		wr := fa.Slots[id]
+		if len(retired) == 0 {
+			continue
+		}
+		retireRestoreKeys(fs, wr, retired)
+		var ok bool
+		wr.Raw, ok = readSlot(w, wr.Slot)
+		wr.Deleted = !ok
+	}
 	for i, op := range j.ops {
 		var prev []string
 		if fa != nil && !rebased {
@@ -620,7 +708,7 @@ func (e *engine) syncFile(j *job, restore bool) (*FileResult, error) {
 	for id, i := range desired {
 		sl, op := j.slots[i], j.ops[i]
 		raw, ok := readSlot(w, sl)
-		wr := &written{Slot: sl, Deleted: !ok, Raw: raw, Keep: op.Keep}
+		wr := &written{Slot: sl, Deleted: !ok, Raw: raw, Keep: op.Keep, RestoreKeys: ownedRestoreKeys(op)}
 		if op.Kind == plan.SetTable && !op.Whole {
 			for _, kv := range op.KVs {
 				wr.Keys = append(wr.Keys, kv.Path)

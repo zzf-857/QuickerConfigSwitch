@@ -78,6 +78,9 @@ func (e *env) cmdUse(args []string, diffOnly bool) error {
 	effort := fs.String("effort", "", "推理强度")
 	yes := fs.Bool("yes", false, "不再确认")
 	dry := fs.Bool("dry-run", false, "只显示变更")
+	relay := fs.Bool("relay", false, "保留官方登录，前台运行本地路由 (仅 Codex)")
+	relayAll := fs.Bool("relay-all", false, "路由中所有模型都发给 provider (需要 --relay)")
+	port := fs.Int("port", 17321, "路由端口 (需要 --relay，0 = 任意空闲端口)")
 	pos, err := e.parse(fs, "qcs "+name+" <agent> <provider>/<model>|official [flags]", args)
 	if err != nil {
 		return err
@@ -88,11 +91,19 @@ func (e *env) cmdUse(args []string, diffOnly bool) error {
 	if *fast && *noFast {
 		return usagef("--fast 与 --no-fast 不能同时使用")
 	}
+	portSet := false
+	fs.Visit(func(f *flag.Flag) { portSet = portSet || f.Name == "port" })
+	if !*relay && (*relayAll || portSet) {
+		return usagef("--relay-all 和 --port 需要 --relay")
+	}
 	a, err := lookupAgent(pos[0])
 	if err != nil {
 		return err
 	}
 	if pos[1] == "official" {
+		if *relay {
+			return usagef("official 不接受 --relay")
+		}
 		return e.restore(a, *yes, *dry || diffOnly)
 	}
 	pid, mid, ok := provider.ParseRef(pos[1])
@@ -106,6 +117,13 @@ func (e *env) cmdUse(args []string, diffOnly bool) error {
 	} else if *noFast {
 		b := false
 		t.Fast = &b
+	}
+	if *relay {
+		if a.ID() != "codex" {
+			return usagef("--relay 仅支持 Codex")
+		}
+		t.Mode, t.RelayAll = agent.Relay, *relayAll
+		return e.useRelay(t, *port, *yes, *dry || diffOnly)
 	}
 	p, err := a.Plan(t)
 	if err != nil {

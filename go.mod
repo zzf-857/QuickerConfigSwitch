@@ -3,6 +3,7 @@ module github.com/zzf-857/quickerconfigswitch
 go 1.26.0
 
 require (
+	github.com/klauspost/compress v1.20.3
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/tidwall/gjson v1.19.0
 	github.com/tidwall/jsonc v0.3.3

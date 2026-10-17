@@ -27,6 +27,10 @@ type Original struct {
 	// path the outermost missing parent object, for a TOML table key its
 	// table.
 	Created string `json:"created,omitempty"`
+	// Restore holds originals of keys excepted from a kept table. They
+	// are released separately, so using the table again captures any key
+	// the user set while it was inactive.
+	Restore map[string]*Original `json:"restore,omitempty"`
 }
 
 // fileStash is one agent's originals for one file.
@@ -55,7 +59,8 @@ type written struct {
 	Keep bool   `json:"keep,omitempty"`
 	// Keys are the keys a merging SetTable set in its table, so a later
 	// one that no longer sets one takes it out.
-	Keys []string `json:"keys,omitempty"`
+	Keys        []string `json:"keys,omitempty"`
+	RestoreKeys []string `json:"restore_keys,omitempty"`
 }
 
 type fileApplied struct {
@@ -167,11 +172,12 @@ func load() (*state, error) {
 			}
 		}
 	}
-	for _, a := range s.applied.Agents {
+	for agent, a := range s.applied.Agents {
 		for _, f := range a.Files {
 			if f.Slots == nil {
 				f.Slots = map[string]*written{}
 			}
+			migrateKeptCredentials(agent, f)
 		}
 	}
 	return s, nil

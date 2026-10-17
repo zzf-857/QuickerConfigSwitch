@@ -123,12 +123,16 @@ func must(t *testing.T, err error) {
 }
 
 func providerTable(keep bool) plan.Op {
-	return plan.Op{Kind: plan.SetTable, Table: "model_providers.qcs-cpa", Keep: keep, KVs: []edit.KV{
+	op := plan.Op{Kind: plan.SetTable, Table: "model_providers.qcs-cpa", Keep: keep, KVs: []edit.KV{
 		{Path: "name", Value: "CPA"},
 		{Path: "base_url", Value: "http://127.0.0.1:8317/v1"},
 		{Path: "wire_api", Value: "responses"},
 		{Path: "experimental_bearer_token", Value: "sk-cpa"},
 	}}
+	if keep {
+		op.RestoreKeys = []string{"experimental_bearer_token"}
+	}
+	return op
 }
 
 // planA is mode D with a generated model catalog.
@@ -399,7 +403,6 @@ func withKeep(t *testing.T, orig string) string {
 		`name = "CPA"`,
 		`base_url = "http://127.0.0.1:8317/v1"`,
 		`wire_api = "responses"`,
-		`experimental_bearer_token = "sk-cpa"`,
 	}, "\n")))
 	return read(t, p)
 }
@@ -441,7 +444,7 @@ func TestKeepSurvives(t *testing.T) {
 			rep, err := Restore("codex")
 			must(t, err)
 			block, ok := edit.GetTOMLTableBlock(e.cfg, "model_providers.qcs-cpa")
-			if !ok || !strings.Contains(block, `experimental_bearer_token = "sk-cpa"`) {
+			if !ok || strings.Contains(block, "experimental_bearer_token") {
 				t.Fatalf("Keep table gone: %q", block)
 			}
 			want := withKeep(t, c.orig)

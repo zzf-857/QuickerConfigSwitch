@@ -112,7 +112,7 @@ func wantTable(extra ...edit.KV) plan.Op {
 		{Path: "wire_api", Value: "responses"},
 		{Path: "experimental_bearer_token", Value: "sk-secret-cpa"},
 	}
-	return plan.Op{Kind: plan.SetTable, Table: "model_providers.qcs-cpa", KVs: append(kvs, extra...), Keep: true}
+	return plan.Op{Kind: plan.SetTable, Table: "model_providers.qcs-cpa", KVs: append(kvs, extra...), Keep: true, RestoreKeys: []string{"experimental_bearer_token"}}
 }
 
 func TestRegistered(t *testing.T) {
@@ -120,7 +120,7 @@ func TestRegistered(t *testing.T) {
 	if !ok || a.Name() != "Codex" {
 		t.Fatalf("registry: %v %v", a, ok)
 	}
-	if got := a.Modes(); !reflect.DeepEqual(got, []agent.Mode{agent.Official, agent.Direct}) {
+	if got := a.Modes(); !reflect.DeepEqual(got, []agent.Mode{agent.Official, agent.Direct, agent.Relay}) {
 		t.Fatalf("modes %v", got)
 	}
 }
@@ -266,9 +266,6 @@ func TestPlanRefusals(t *testing.T) {
 		if p, err := New().Plan(tg); err == nil {
 			t.Errorf("%s: planned %+v", name, p)
 		}
-	}
-	if _, err := New().Plan(agent.Target{Mode: agent.Relay, Provider: "cpa", Model: "gpt-5.5"}); err != ErrRelayUnavailable {
-		t.Errorf("relay: %v", err)
 	}
 	writeFile(t, ConfigPath(), "model = \"gpt-5.5\"\n[features\nfast_mode = true\n")
 	if _, err := New().Plan(agent.Target{Mode: agent.Direct, Provider: "cpa", Model: "gpt-5.5"}); err == nil || !strings.Contains(err.Error(), "not valid TOML") {

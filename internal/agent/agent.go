@@ -39,6 +39,9 @@ type Target struct {
 	// RelayAll sends every model through the provider in Relay mode,
 	// official ones too; false keeps official models on the sign-in.
 	RelayAll bool
+	// RelayURL is the listening relay's loopback base URL. The process
+	// that owns the listener supplies it before applying a Relay plan.
+	RelayURL string
 }
 
 // Detection is what is known about an agent on this machine.

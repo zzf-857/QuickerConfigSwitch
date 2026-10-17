@@ -9,7 +9,7 @@
 //     provider's key as experimental_bearer_token, and, when Codex's bundled
 //     catalog wouldn't list the models with the wanted Fast tier, a
 //     generated `model_catalog_json`.
-//   - Relay (phase 2): only `openai_base_url`, sign-in kept.
+//   - Relay: only `openai_base_url`, sign-in kept.
 //
 // What Codex does that this follows (openai/codex codex-rs):
 //   - core/src/config/mod.rs: the provider named by model_provider is looked
@@ -47,6 +47,7 @@ import (
 	"github.com/zzf-857/quickerconfigswitch/internal/agent"
 	"github.com/zzf-857/quickerconfigswitch/internal/appdir"
 	"github.com/zzf-857/quickerconfigswitch/internal/edit"
+	"github.com/zzf-857/quickerconfigswitch/internal/safekeep"
 )
 
 func init() { agent.Register(New()) }
@@ -66,8 +67,8 @@ func New() *Codex { return &Codex{} }
 func (*Codex) ID() string   { return ID }
 func (*Codex) Name() string { return "Codex" }
 
-// Modes are Official and Direct; Relay comes with the local relay.
-func (*Codex) Modes() []agent.Mode { return []agent.Mode{agent.Official, agent.Direct} }
+// Modes includes the foreground local relay managed by the CLI.
+func (*Codex) Modes() []agent.Mode { return []agent.Mode{agent.Official, agent.Direct, agent.Relay} }
 
 // ConfigPath is Codex's config.toml.
 func ConfigPath() string { return filepath.Join(appdir.CodexHome(), "config.toml") }
@@ -245,6 +246,12 @@ func (c *Codex) Current() (agent.Status, error) {
 	case mp == "" || mp == "openai":
 		st := agent.Status{Mode: agent.Official, Model: model}
 		if u := top("openai_base_url"); u != "" {
+			s := safekeep.State(ID)
+			if s["mode"] == string(agent.Relay) && s["relay_url"] == u {
+				st.Mode, st.Provider = agent.Relay, s["provider"]
+				st.Detail = "本地路由 " + u + "；需保持路由进程运行"
+				return st, nil
+			}
 			st.Detail = fmt.Sprintf("openai_base_url = %s（自定义地址）", u)
 		}
 		return st, nil

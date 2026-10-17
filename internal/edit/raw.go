@@ -33,6 +33,22 @@ func GetTOMLKeyRaw(path, name, key string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
+	return tomlKeyRaw(tables, name, key)
+}
+
+// TOMLKeyRaw reads a table key from recorded TOML text without writing a
+// temporary file. Parse errors are returned so a bad record is never
+// mistaken for an absent original value.
+func TOMLKeyRaw(raw, name, key string) (string, bool, error) {
+	tables, err := parseTOMLTables(splitLines(strings.TrimPrefix(raw, "\xef\xbb\xbf")))
+	if err != nil {
+		return "", false, err
+	}
+	value, ok := tomlKeyRaw(tables, name, key)
+	return value, ok, nil
+}
+
+func tomlKeyRaw(tables []tomlTableSpan, name, key string) (string, bool) {
 	table, ok := tomlTableNamed(tables, name)
 	if !ok || table.array {
 		return "", false

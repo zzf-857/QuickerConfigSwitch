@@ -65,7 +65,7 @@
 }
 
 * { box-sizing: border-box; }
-html { scrollbar-gutter: stable; }
+html { scrollbar-gutter: stable; background: var(--bg); }
 body {
   margin: 0;
   background: var(--bg);
@@ -301,7 +301,7 @@ fieldset[disabled] .seg-group label { cursor: default; }
 .preview { display: flex; flex-direction: column; gap: 10px; }
 .step { display: flex; flex-direction: column; gap: 6px; }
 .step + .step { border-top: 1px solid var(--border); padding-top: 10px; }
-.step h3 { font-family: var(--mono); }
+.step h3 { font-size: 13.5px; }
 
 /* ---- modal ---- */
 .backdrop {
@@ -367,7 +367,7 @@ fieldset[disabled] .seg-group label { cursor: default; }
 /* ---- toasts ---- */
 .toasts {
   position: fixed; z-index: 60; top: 10px; left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; gap: 8px; align-items: center;
+  display: flex; flex-direction: column; gap: 8px; align-items: stretch;
   width: max-content; max-width: min(460px, calc(100vw - 24px));
   pointer-events: none;
 }

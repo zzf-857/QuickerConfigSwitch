@@ -40,7 +40,7 @@ async function applyFlow(app, p, btn) {
   const steps = res.steps || [];
   const allNothing = steps.every((s) => !s.error && s.preview.nothing);
   const body = h('div', { class: 'preview' },
-    steps.length ? [h('small', { class: 'muted legend' }, t('diffLegend')), steps.map((s) => stepView(app, s, false))] : h('p', { class: 'muted' }, t('emptyProfile')));
+    steps.length ? [allNothing ? null : h('small', { class: 'muted legend' }, t('diffLegend')), steps.map((s) => stepView(app, s, false))] : h('p', { class: 'muted' }, t('emptyProfile')));
   const cancel = h('button', { class: 'btn', onclick: () => m.close() }, allNothing ? t('close') : t('cancel'));
   const ok = h('button', { class: 'btn btn-primary' }, t('confirmApply'));
   ok.addEventListener('click', async () => {

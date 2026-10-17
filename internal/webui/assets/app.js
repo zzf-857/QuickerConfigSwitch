@@ -39,6 +39,7 @@ function setBanner(msg) {
 }
 
 function failBanner(e) {
+  if (!app.state) main.replaceChildren();
   if (e instanceof APIError && e.status === 401) setBanner(t('needToken'));
   else if (e instanceof APIError && e.status === 0) setBanner(t('offline'));
   else setBanner(`${t('errorPrefix')}：${e.message}`);

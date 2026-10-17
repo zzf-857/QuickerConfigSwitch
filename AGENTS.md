@@ -36,9 +36,13 @@ for the Codex/ChatGPT desktop and Claude CLI/Desktop configuration boundaries.
 
 ## Validation and stages
 
-On the prepared cloud machine source `/workspace/.qcs-tools/activate.sh` for
-Go 1.26. Else use an installed Go matching `go.mod`. In test shells run
-`umask 022` because the readonly-file fixtures depend on ordinary permissions.
+Go 1.26 is selected from `go.mod` by `GOTOOLCHAIN=auto`; Ubuntu's packaged
+Go 1.22 is enough to start that download. In test shells run `umask 022`
+because the readonly-file fixtures depend on ordinary permissions.
+
+## Cursor Cloud specific instructions
+
+The Cloud Agent install script installs `libgtk-3-dev` and `libwebkit2gtk-4.1-dev`, then runs `go mod download`. No daemon has to be running before development. `qcs web` and `go run ./internal/webui/internal/devserver` are started only when someone is looking at the UI. Node is already on the login `PATH` for the frontend tests. There is no `/workspace/.qcs-tools` tree on this environment.
 
 ```sh
 go test -race -p 4 -tags nogui ./...

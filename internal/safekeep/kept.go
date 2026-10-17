@@ -8,7 +8,7 @@ import (
 	"github.com/zzf-857/quickerconfigswitch/internal/plan"
 )
 
-// Older Codex plans kept the entire provider, including its credential.
+// Older Codex plans kept the entire provider, including its credentials.
 // Migrate only recorded QCS tables whose merge explicitly wrote the key;
 // a matching table name alone is not evidence that the key belongs to us.
 func migrateKeptCredentials(agent string, f *fileApplied) {
@@ -16,10 +16,15 @@ func migrateKeptCredentials(agent string, f *fileApplied) {
 		return
 	}
 	for _, wr := range f.Slots {
-		if wr.Kind == TOMLTable && wr.Keep && !wr.Deleted &&
-			strings.HasPrefix(wr.Table, "model_providers.qcs-") &&
-			len(wr.RestoreKeys) == 0 && slices.Contains(wr.Keys, "experimental_bearer_token") {
-			wr.RestoreKeys = []string{"experimental_bearer_token"}
+		if wr.Kind != TOMLTable || !wr.Keep || wr.Deleted || !strings.HasPrefix(wr.Table, "model_providers.qcs-") {
+			continue
+		}
+		// Token-only restore policies also need upgrading: credentials can
+		// be supplied through Authorization, X-Api-Key or Cookie headers.
+		for _, key := range []string{"experimental_bearer_token", "http_headers"} {
+			if slices.Contains(wr.Keys, key) && !slices.Contains(wr.RestoreKeys, key) {
+				wr.RestoreKeys = append(wr.RestoreKeys, key)
+			}
 		}
 	}
 }

@@ -82,7 +82,7 @@ func (c *Codex) relayPlan(t agent.Target) (*plan.Plan, error) {
 			"mode": string(agent.Relay), "provider": p.ID, "model": t.Model,
 			"relay_url": t.RelayURL, "relay_all": strconv.FormatBool(t.RelayAll),
 		},
-		Notice: "保持此进程运行，并重启 Codex 桌面端或新开 CLI 会话。" +
+		Notice: "保持此进程运行，并重启 Codex 桌面端及仍在运行的共享 app-server，再打开新 CLI 会话。" +
 			"在 Codex 模型选择器中选择 " + p.ID + "/" + t.Model + "；Fast 和推理强度仍由 Codex 控制。" +
 			"停止路由后自动还原地址，需再次重启 Codex。auth.json 没有被修改。",
 	}, nil

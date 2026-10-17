@@ -126,7 +126,7 @@ func New(o Options) (http.Handler, error) {
 		setTarget(r, official, strings.TrimPrefix(r.In.URL.Path, codexPath))
 	}
 	s.official = proxy(o.Transport, toOfficial, nil)
-	s.catalog = proxy(o.Transport, func(r *httputil.ProxyRequest) {
+	catalogProxy := proxy(o.Transport, func(r *httputil.ProxyRequest) {
 		toOfficial(r)
 		// The response includes local entries, so official cache validators and
 		// byte ranges cannot describe it. Request a whole uncompressed list.
@@ -134,7 +134,20 @@ func New(o Options) (http.Handler, error) {
 			r.Out.Header.Del(k)
 		}
 		r.Out.Header.Set("Accept-Encoding", "identity")
-	}, func(r *http.Response) error { return mergeModels(r, aliases) })
+	}, func(r *http.Response) error {
+		switch r.StatusCode {
+		case http.StatusOK:
+			return mergeModels(r, aliases)
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return nil // Codex must see that its own sign-in needs attention.
+		default:
+			return errors.New("official model list unavailable")
+		}
+	})
+	s.catalog, err = catalogHandler(catalogProxy, aliases, o.CodexHome, modelsWait)
+	if err != nil {
+		return nil, err
+	}
 	s.custom = proxy(o.Transport, func(r *httputil.ProxyRequest) {
 		setTarget(r, base, strings.TrimPrefix(r.In.URL.Path, codexPath))
 		// The Responses endpoint needs no ChatGPT query parameters. Keep
@@ -206,7 +219,7 @@ func setTarget(r *httputil.ProxyRequest, target *url.URL, suffix string) {
 	r.Out.Host = target.Host
 }
 
-func proxy(transport http.RoundTripper, rewrite func(*httputil.ProxyRequest), modify func(*http.Response) error) http.Handler {
+func proxy(transport http.RoundTripper, rewrite func(*httputil.ProxyRequest), modify func(*http.Response) error) *httputil.ReverseProxy {
 	return &httputil.ReverseProxy{
 		Rewrite: rewrite, Transport: transport, ModifyResponse: modify,
 		FlushInterval: -1, // flush SSE events immediately, including custom transports
@@ -326,6 +339,12 @@ func (s *server) responses(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "cannot rewrite relay request", http.StatusBadRequest)
 			return
 		}
+	} else if !s.all && strings.Contains(model, "/") {
+		// Adapted from Magpie's codexBackend namespace guard (MIT,
+		// internal/gateway/codex_backend.go at 7660399a121af67db4efd56ecb6bd4fb04dc53f1).
+		// A provider namespace never falls through to the official account.
+		http.Error(w, "unknown relay provider namespace", http.StatusBadRequest)
+		return
 	}
 	if custom {
 		r.Header.Del("Content-Encoding")

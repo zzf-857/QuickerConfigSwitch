@@ -19,8 +19,9 @@ import (
 // earlier plan wrote and this one leaves out (model_catalog_json,
 // service_tier, model_reasoning_effort) is put back by the executor.
 //
-// Never touched: auth.json, [features], [desktop], [profiles.*],
-// [mcp_servers.*], CC Switch's provider tables, openai_base_url.
+// Direct mode never touches auth.json, [features], [desktop], [profiles.*],
+// [mcp_servers.*], CC Switch's provider tables or openai_base_url.
+// Relay mode changes only openai_base_url; see relayPlan.
 func (c *Codex) Plan(t agent.Target) (*plan.Plan, error) {
 	switch t.Mode {
 	case agent.Direct:
@@ -121,7 +122,7 @@ func (c *Codex) Plan(t agent.Target) (*plan.Plan, error) {
 	}
 	top = append(top, plan.Op{
 		Kind: plan.SetTable, Table: "model_providers." + table, KVs: tableKVs(p), Keep: true,
-		RestoreKeys: []string{"experimental_bearer_token"},
+		RestoreKeys: []string{"experimental_bearer_token", "http_headers"},
 	})
 	// the catalog first: config.toml names it
 	edits = append(edits, plan.FileEdit{Path: path, Format: plan.TOML, Ops: top})
@@ -185,7 +186,7 @@ func catalogModels(p provider.Provider, chosen string, fast *bool) []codexcat.Mo
 }
 
 func notice() string {
-	return "重启 Codex 桌面端，或新开一个 Codex CLI 会话后生效。" +
+	return "重启 Codex 桌面端及仍在运行的共享 app-server，再打开新的 Codex CLI 会话。" +
 		"直连模式下，Codex 桌面端只列出在这个 provider 上开的会话，且暂时没有 ChatGPT 登录态功能（远程控制、云任务等）；" +
 		"切回官方即恢复。auth.json 没有被修改。"
 }

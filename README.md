@@ -46,7 +46,7 @@ qcs doctor                                 # 检查冲突与漂移
 
 切到 Codex 直连模式后：
 
-- 重启 Codex 桌面端（或新开 CLI 会话）生效；
+- 重启 Codex 桌面端及仍在运行的共享 app-server，再打开新 CLI 会话；共享进程可能缓存旧地址和模型目录，仅新开终端不一定生效；
 - 桌面端只显示在这个 provider 上开的会话，ChatGPT 登录态功能暂不可用；切回官方即恢复；
 - `[model_providers.qcs-<id>]` 表在切回官方后会保留，以便加载旧会话；qcs 写入的密钥会撤销，原来已有的密钥还原，被用户另行修改的值保留。再次使用该 provider 时重新切换即可写入当前密钥。
 
@@ -62,6 +62,8 @@ qcs relay recover                           # 异常退出后只恢复配置
 ```
 
 保持终端中的路由进程运行，重启 Codex，再在模型选择器里选择 `cpa/gpt-5.5`。默认并存模式下，原有官方模型仍走官方订阅，带 `cpa/` 前缀的模型走 CPA。`--relay-all` 也将没有前缀的模型发给 CPA，需要上游支持对应模型。
+
+模型目录沿用 Magpie 的三秒官方请求预算：网络不可用时回退到 Codex 现有缓存并追加当前 provider 别名，无缓存时仍返回别名；官方 401/403 会正常显示。并存模式的未知 provider 前缀会在本地拒绝。
 
 路由只改 `openai_base_url`，保留 `model_provider`、当前模型、Fast 和推理强度；在 Codex 内调整这些选择。已有自定义 `model_catalog_json` 或活动 profile 中覆盖路由配置的字段时，会提示先处理冲突。CLI 路由不接受 `--fast`、`--no-fast`、`--effort`。
 

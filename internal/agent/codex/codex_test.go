@@ -112,7 +112,7 @@ func wantTable(extra ...edit.KV) plan.Op {
 		{Path: "wire_api", Value: "responses"},
 		{Path: "experimental_bearer_token", Value: "sk-secret-cpa"},
 	}
-	return plan.Op{Kind: plan.SetTable, Table: "model_providers.qcs-cpa", KVs: append(kvs, extra...), Keep: true, RestoreKeys: []string{"experimental_bearer_token"}}
+	return plan.Op{Kind: plan.SetTable, Table: "model_providers.qcs-cpa", KVs: append(kvs, extra...), Keep: true, RestoreKeys: []string{"experimental_bearer_token", "http_headers"}}
 }
 
 func TestRegistered(t *testing.T) {

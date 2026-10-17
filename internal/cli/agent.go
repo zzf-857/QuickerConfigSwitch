@@ -46,11 +46,17 @@ func (e *env) cmdLs(args []string) error {
 			fmt.Fprintf(e.out, "  current:   读取失败: %v\n", err)
 		} else {
 			line := string(st.Mode)
-			if st.Provider != "" {
+			if st.Provider != "" && st.Mode != agent.Relay {
 				line += " " + st.Provider
 			}
 			if st.Model != "" {
-				line += "/" + st.Model
+				if st.Mode == agent.Relay {
+					// Relay preserves Codex's actual model. A plain official
+					// slug must not look like a provider-prefixed model.
+					line += " " + st.Model
+				} else {
+					line += "/" + st.Model
+				}
 			}
 			if st.Detail != "" {
 				line += "  " + st.Detail

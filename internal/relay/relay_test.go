@@ -73,7 +73,7 @@ func TestResponsesRouting(t *testing.T) {
 		{"official compact", "gpt-5.5", "/responses/compact", "gpt-5.5", false, false},
 		{"all plain", "unlisted-model", "/responses", "unlisted-model", true, true},
 		{"all alias", "cpa/gpt-5.5", "/responses", "gpt-5.5", true, true},
-		{"other prefix", "vendor/model", "/responses", "vendor/model", false, false},
+		{"all vendor model", "vendor/model", "/responses", "vendor/model", true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			official, officialRequests := upstream(t)
@@ -271,6 +271,7 @@ func TestGuardsAndInvalidBodies(t *testing.T) {
 		{name: "array", method: "POST", path: "/responses", body: `[]`, want: 400},
 		{name: "trailing body", method: "POST", path: "/responses", body: `{"model":"gpt-5.5"}{}`, want: 400},
 		{name: "unknown alias", method: "POST", path: "/responses", body: `{"model":"cpa/unknown"}`, want: 400},
+		{name: "unknown provider", method: "POST", path: "/responses", body: `{"model":"other/model"}`, want: 400},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest(tc.method, "http://127.0.0.1"+codexPath+tc.path, strings.NewReader(tc.body))
@@ -312,7 +313,7 @@ func TestOfficialOtherPath(t *testing.T) {
 }
 
 func TestUpstreamStatusAndRedirects(t *testing.T) {
-	for _, code := range []int{http.StatusUnauthorized, http.StatusTooManyRequests, http.StatusTemporaryRedirect} {
+	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests, http.StatusTemporaryRedirect, http.StatusInternalServerError} {
 		t.Run(fmt.Sprint(code), func(t *testing.T) {
 			var followed bool
 			dest := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { followed = true }))
@@ -336,7 +337,15 @@ func TestUpstreamStatusAndRedirects(t *testing.T) {
 				r := httptest.NewRequest(method, "http://127.0.0.1"+codexPath+path, strings.NewReader(body))
 				w := httptest.NewRecorder()
 				h.ServeHTTP(w, r)
-				if code >= 300 && code <= 399 && path == "/responses" {
+				if path == "/models" && code != http.StatusUnauthorized && code != http.StatusForbidden {
+					if w.Code != 200 || w.Header().Get("Location") != "" || w.Header().Get("Retry-After") != "" ||
+						w.Header().Get("X-QCS-Catalog-Source") != "local" || followed {
+						t.Fatalf("catalog failure did not fall back locally: %d, headers %v", w.Code, w.Header())
+					}
+					if models := decodeCatalog(t, w.Body.Bytes()); len(models) != 2 {
+						t.Fatalf("missing local aliases: %d", len(models))
+					}
+				} else if code >= 300 && code <= 399 && path == "/responses" {
 					if w.Code != 502 || w.Header().Get("Location") != "" || w.Header().Get("Retry-After") != "" || w.Body.String() != "relay upstream unavailable\n" || followed {
 						t.Fatalf("provider redirect exposed: %d %s, headers %v", w.Code, w.Body.String(), w.Header())
 					}
@@ -377,7 +386,7 @@ func TestInvalidOfficialCatalog(t *testing.T) {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "http://127.0.0.1"+codexPath+"/models", nil))
 		up.Close()
-		if w.Code != 502 {
+		if w.Code != http.StatusOK || w.Header().Get("X-QCS-Catalog-Source") != "local" || len(decodeCatalog(t, w.Body.Bytes())) != 2 {
 			t.Fatalf("invalid official catalog returned %d", w.Code)
 		}
 	}

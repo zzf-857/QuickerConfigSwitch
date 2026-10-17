@@ -50,7 +50,10 @@ func TestRelayPreviewCancelAndForeground(t *testing.T) {
 }
 
 func TestRelayFlagsAndRecovery(t *testing.T) {
-	setup(t)
+	dir, _ := setup(t)
+	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(codexCfg), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	addCPA(t)
 	for _, args := range [][]string{
 		{"use", "codex", "cpa/gpt-5.5", "--relay-all"},
@@ -77,6 +80,9 @@ func TestRelayFlagsAndRecovery(t *testing.T) {
 	}
 	if err := safekeep.Apply(p); err != nil {
 		t.Fatal(err)
+	}
+	if out := mustRun(t, "", "ls"); !strings.Contains(out, "current:   relay gpt-5") || strings.Contains(out, "current:   relay cpa/") {
+		t.Fatalf("relay target was presented as Codex's selected model: %s", out)
 	}
 	out := mustRun(t, "", "relay", "recover")
 	if !strings.Contains(out, "已恢复异常退出") || safekeep.Touched("codex") {

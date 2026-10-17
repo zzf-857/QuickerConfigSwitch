@@ -8,5 +8,9 @@ Parts of this project are adapted from third-party code:
   yetone/magpie internal/autostart and internal/cli/autostart_cli.go at
   7660399a121af67db4efd56ecb6bd4fb04dc53f1, Copyright (c) 2026 yetone,
   MIT License — see third_party/magpie/LICENSE and docs/UPSTREAM.md.
+- The model-list timeout/cache fallback and model-namespace checks under
+  internal/relay are adapted from yetone/magpie internal/gateway/codex_backend.go
+  and internal/codexcat/codexcat.go at 7660399a121af67db4efd56ecb6bd4fb04dc53f1,
+  Copyright (c) 2026 yetone, MIT License — see third_party/magpie/LICENSE.
 - internal/codexcat embeds Codex's bundled model catalog and system prompt from
   openai/codex (https://github.com/openai/codex), Apache License 2.0.

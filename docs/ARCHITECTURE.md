@@ -314,6 +314,11 @@ CLI 使用 `qcs use codex <provider>/<model> --relay` 前台持有路由；GUI/W
 
 Codex 在官方 provider + ChatGPT 登录时默认启用 zstd 请求压缩（`codex-rs/core/src/client.rs` 的 `responses_request_compression`）。路由对压缩前后正文都设大小限制，解压读取模型；官方请求继续使用原始压缩字节，第三方请求使用去前缀后的 JSON 并移除编码头。第三方查询参数不透传，3xx 返回 502，避免客户端绕过路由向新地址转发账户头。
 
+目录请求精简移植 Magpie `codexModels`：给官方后端三秒预算，成功时保留目录字段，
+401/403 原样返回；其它不可用情况只读有界的 `models_cache.json` 回退，过滤旧 provider
+前缀条目再追加当前别名。无缓存则返回当前别名。并存模式的未知命名空间在本地拒绝，
+全走上游仍允许上游自身带 `/` 的模型 ID。来源与本地适配见 UPSTREAM.md。
+
 ### 4.9 GUI 与 CLI
 
 - **GUI**：Wails v3（托盘 + 主窗口，与 magpie 相同），前端为原生 JavaScript 模块，通过 `go:embed` 进二进制，无单独构建步骤。三个页面：

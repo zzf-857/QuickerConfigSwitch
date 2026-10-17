@@ -19,14 +19,15 @@
 | `internal/codexcat` | `internal/codexcat` | 保留模型条目/Fast 逻辑，适配本项目 provider 类型 |
 | `internal/autostart`（阶段 C） | `internal/autostart` 的 self/XDG/LaunchAgent/Run/StartupApproved | 直接裁剪平台实现，替换产品名及 `gui --hidden` 参数；增加显式 GUI 能力与已有记录保护 |
 | `internal/cli/autostart.go`（阶段 C） | `internal/cli/autostart_cli.go` | 沿用显式启停后查询系统真实记录的流程，适配本项目输出与错误码 |
+| `internal/relay/models.go`、命名空间检查（阶段 D） | `internal/gateway/codex_backend.go` 的 `codexModelsWait`、`codexModels`、`codexBackend`；`internal/codexcat/codexcat.go` 的 `CacheEntries` | 精简提取三秒预算、目录缓存回退与未知前缀拒绝，保留原始 JSON、只读/有界缓存、401/403 和会话权限边界 |
 
 Magpie 的配置适配器与网关不是直接整包复制的目标：它们还包含账户、路由组、
 后台守护进程和自动重启等本项目暂不需要的功能。只提取当前配置切换所需部分。
 
 ## 路由相关参考边界
 
-- `internal/gateway/codex_backend.go`：优先对照模型目录获取、超时与回退、模型命名空间、
-  HTTP/SSE 与头部处理。后续提取时同步复制相关回归测试并注明函数/提交。
+- `internal/gateway/codex_backend.go`：阶段 D 已提取目录限时/回退和命名空间检查；
+  HTTP/SSE 仍使用本项目的小型 ReverseProxy，不导入账户池、路由组或协议转换。
 - `internal/agent/codex.go` 的 `EndCodexFailover`：本项目保留 snapshot + 会话条件还原，
   以恢复用户原来的地址，并保留后来发生的其它切换，不引入其完整 daemon 管理。
 - Codex 的共享 app-server 可能跨新 CLI 会话保留 base URL 和模型目录。改配置后需确认

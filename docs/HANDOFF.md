@@ -1,11 +1,11 @@
 # 交接文档
 
 > 截至 2026-10-17。后续工作按阶段验证并提交；阶段状态见 [STAGES.md](STAGES.md)，具体提交见 Git 历史。原交接分支为 `claude/exciting-galileo-cgd4uk`。
-> 接手顺序：[AGENTS.md](../AGENTS.md)（开发规范）→ [README.md](../README.md)（用法）→ 本文与 [STAGES.md](STAGES.md)（状态/下一步）→ [ARCHITECTURE.md](ARCHITECTURE.md)（设计细节）。
+> 接手顺序：[AGENTS.md](../AGENTS.md)（开发规范）→ [README.md](../README.md)（用法）→ 本文与 [STAGES.md](STAGES.md)（状态/下一步）→ [UPSTREAM.md](UPSTREAM.md)（Magpie 复用）及 [ACCEPTANCE.md](ACCEPTANCE.md)（真机验收）→ [ARCHITECTURE.md](ARCHITECTURE.md)（设计细节）。
 
 ## 1. 一句话现状
 
-CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、GUI/Web 和托盘生命周期管理**，并复用了 Magpie 的可选登录自启实现。后续按阶段继续核对并提取上游成熟逻辑，具体状态与验证见 [STAGES.md](STAGES.md)，复用映射见 [UPSTREAM.md](UPSTREAM.md)。真实用户机器上的验收仍未完成，不能把本地假后端测试视为真实 Codex/CPA 验收。
+CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、GUI/Web 和托盘生命周期管理**，并复用了 Magpie 的可选登录自启、目录回退与命名空间检查。A–D 四个阶段均已测试并本地提交，具体记录见 [STAGES.md](STAGES.md)，复用映射见 [UPSTREAM.md](UPSTREAM.md)。真实用户机器上的验收仍未完成，不能把本地假后端测试视为真实 Codex/CPA 验收。
 
 ## 2. 已完成的功能
 
@@ -61,6 +61,7 @@ make cli
 - Web fixture HTTP 冒烟通过：页面、授权状态查询、未授权 401、切换预览。Unix 子进程测试验证 SIGTERM、SIGKILL、重启恢复和登录文件不变。
 - 阶段 B：新增控制器/鉴权 API/进程级检查，前端现在 15 项测试；真实后端 Chromium 验证全部预览关闭路径、单次确认、网络失败释放、停止还原、方案守护和编辑保护。GTK3 原生窗口在 Xvfb 下启动；实际托盘宿主与真实账号仍待验收。
 - 阶段 C：GTK3 全量 race/vet/桌面构建通过，前端 18 项；当前用户自启的 CLI/API 与浏览器流程仅在临时 HOME 中测试，Windows 使用假注册表。系统 GLib 验证转义与参数，Windows GUI/macOS CLI 交叉编译通过。真实登录与系统策略待验收。
+- 最终阶段 D：GTK3/`nogui` 全量 race、vet、模块校验、前端 18 项、Linux 桌面与 Windows GUI/macOS CLI 构建通过；GTK3 17 个有测试的包、318 个顶层测试通过，2 项条件跳过。只读缓存回退、取消/超时分离、未知前缀和认证头还原回归覆盖已加入。
 
 ## 4. 代码地图
 
@@ -91,7 +92,7 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - **适配器永远不写文件**，只返回 `plan.Plan`；写入、备份、还原全部由 `safekeep` 负责。
 - `safekeep.Apply` 的语义是"本次计划是该 Agent 的**全部**期望状态"：上次写过、这次没写的键会还原。
 - `plan.Op.Keep`：还原时保留（Codex 的 `[model_providers.qcs-*]` 表，旧会话重新打开要用）。
-- `plan.Op.RestoreKeys`：Keep 表中仍须撤销的键，当前用于 `experimental_bearer_token`；按键记录原值与最后写入值，用户改过的值不动。旧状态迁移只处理仍有明确写入记录的 qcs 表。
+- `plan.Op.RestoreKeys`：Keep 表中仍须撤销的键，当前用于 `experimental_bearer_token` 与 `http_headers`；按键记录原值与最后写入值，用户改过的值不动。旧状态迁移逐项处理仍有明确写入记录的 qcs 表，包括早期只撤销 token 的记录。`http_headers` 作为整体键管理，用户改动后会保留并报告，不猜测删除子项。
 - `safekeep.RestoreIfState`：锁内校验会话标记后还原；路由退出不能撤销另一个进程后来的切换。Apply/Restore 在配置文件和状态记录任一写入失败时一起回滚。
 - GUI/Web 的 `core.RelayController` 由宿主进程创建并负责 Close；Handler 不隐式创建生命周期。Wails `OnShutdown` 必须同步清理，单用 defer 在部分平台无效。路由预览返回一次性 ID，确认只用该 ID；关闭/超时不能保留进程锁。
 - 数据目录：`appdir.Dir()`（可用 `QCS_HOME` 覆盖）下的 `providers.json`、`profiles.json`、`state/stash.json`、`state/applied.json`、`backups/`、`codex/catalog-*.json`。
@@ -110,6 +111,7 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - 已完成：`core.PrepareRelay` 预览并持有进程锁，`Start` 重新校验后写入，退出按会话标记还原；默认端口占用时回退；异常退出后重启接管或 `qcs relay recover`。运行中的路由暂不能保存为普通方案。
 - 已完成：GUI/Web/托盘的共享路由控制器和生命周期；主窗口关闭只隐藏，退出应用会还原；Web 服务关闭会还原，关浏览器标签不会停止已经运行的路由。预览两分钟后自动释放。
 - 已完成：可选择的当前用户登录自启，只启动隐藏 GUI，不恢复路由。`nogui` 构建可检查/撤销，拒绝启用。
+- 已完成：精简移植 Magpie 模型目录的三秒预算及现有缓存回退。官方 401/403 继续显示；其它不可用情况返回已有官方目录和当前别名（无可用缓存则只有当前别名）。缓存只读，不把旧命名空间条目当成官方模型。未知 provider 前缀在并存模式下本地拒绝。
 - 后续：真实 Codex/CPA 验收（含压缩请求和 426 后 HTTP 回退）。不要将 CLI 进程直接启动后立即退出，否则配置会随清理还原。
 
 **其他待办**
@@ -131,3 +133,7 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 ## 7. 提交历史里的 WIP
 
 几处 "WIP …" 提交是子代理工作中途的检查点，后续提交已完成对应内容，不需要处理。
+
+本轮按阶段提交，不使用中途 WIP：A 为安全还原与 CLI 路由，B 为共享 GUI/Web 路由管理，
+C 为 Magpie 自启移植，D 为上游回退/命名空间与认证头还原。阶段边界与验证在 STAGES.md，
+真实机器尚未验证的条目在 ACCEPTANCE.md；之后接手先核对这些文档与 `git log`。

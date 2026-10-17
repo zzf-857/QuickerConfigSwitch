@@ -51,3 +51,4 @@ Use the existing isolated checkout; create another worktree only if requested.
 Keep milestones, validation, limitations and next steps in repository docs so
 another agent can resume without reading prior chat. Do not claim real-account
 or real-desktop acceptance from fixture tests.
+Use `docs/ACCEPTANCE.md` for the remaining native-machine checks and evidence.

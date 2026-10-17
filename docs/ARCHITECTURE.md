@@ -64,7 +64,11 @@ magpie 是一个约 30 万行的 Go 项目（Wails v3 托盘应用 + 本地网�
 
 ### 2.3 CPA 会不会把 Fast 吃掉
 
-不会。CPA 的 `internal/translator/codex/openai/responses/codex_openai-responses_request.go` 把 `service_tier` 为 `priority`/`fast` 的统一成 `priority` 透传给它的 Codex 账号，`ultrafast` 也透传，其它值删掉。所以**只要 Codex 发出了 `service_tier: priority`，经 CPA 也是真 Fast**。
+核对 CPA `911f49cbd49f4fe2516979754a7488a3fd14fe64` 的
+`internal/translator/codex/openai/responses/codex_openai-responses_request.go`：
+`fast` 规范为 `priority`，`priority`、`ultrafast` 保留，其它值删掉。
+qcs 保留目录中的 Fast 能力和请求档位；**实际优先级、计费与速度取决于 CPA、模型及上游账号**，
+不能仅凭本地转发测试证明真实提速。实际 Codex 0.159.2 的隔离目录加载证据见 REQUIREMENTS.md。
 
 ### 2.4 为什么"整文件替换"式切换会丢东西
 
@@ -91,10 +95,10 @@ CC Switch 的 Codex 供应商同时保存 `auth`（即 `auth.json` 内容，第�
 用户的两个诉求对应关系：
 
 - "**继续保留官方订阅登录**" → D 和 R 都不碰 `auth.json`，切回即恢复；R 期间登录仍在使用。
-- "**全部走 CPA，但保留原始的 Fast**" → D 或 R「全走 CPA」都能做到：确保目录里有 `priority` 档，CPA 原样透传。
-- 如果还要"历史会话不丢、桌面端功能不丢" → 只有 R 能做到。
+- "**全部模型请求走 CPA，但保留原始的 Fast**" → D 或 R「全走 CPA」保留档位；若还要活动官方登录，使用 R。CPA 需支持发来的模型与档位。
+- 保留官方 provider 下的会话与登录态，应使用 R；具体桌面功能仍需真机验收。目录和其它官方路径不属于「全部模型请求」。
 
-> 推荐顺序：MVP 先做 O + D（纯配置，零常驻）；R 作为第二阶段的可选模块。
+> O、D、R 均已实现。实现状态和验收边界以 HANDOFF.md、REQUIREMENTS.md 为准。
 
 ---
 

@@ -93,10 +93,17 @@ func lockPath() string    { return filepath.Join(appdir.StateDir(), "lock") }
 // processes (a GUI and a CLI run at once).
 var mu sync.Mutex
 
-func lockAll() (unlock func()) {
+func lockAll() (unlock func(), err error) {
 	mu.Lock()
-	release, _ := filelock.Lock(lockPath(), filelock.Wait)
-	return func() { release(); mu.Unlock() }
+	release, held := filelock.Lock(lockPath(), filelock.Wait)
+	if !held {
+		// The shared primitive permits a best-effort caller to proceed;
+		// configuration and its restore records require exclusive ownership.
+		release()
+		mu.Unlock()
+		return nil, fmt.Errorf("safekeep: cannot acquire state lock %s; no configuration was changed", lockPath())
+	}
+	return func() { release(); mu.Unlock() }, nil
 }
 
 // readJSON reads path into v. A missing file leaves v as it is; one that

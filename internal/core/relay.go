@@ -111,7 +111,7 @@ func PrepareRelay(t agent.Target, port int) (*RelaySession, error) {
 	}
 	p := s.provider
 	if len(p.Models) == 0 {
-		p.Models = []provider.Model{{ID: t.Model}}
+		p.Models = []provider.Model{{ID: t.Model, Fast: provider.DefaultFast(t.Model)}}
 	}
 	handler, err := relay.New(relay.Options{Provider: p, All: t.RelayAll, CodexHome: appdir.CodexHome()})
 	if err != nil {

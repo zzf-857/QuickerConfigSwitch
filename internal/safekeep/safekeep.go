@@ -133,7 +133,10 @@ func Apply(p *plan.Plan) error {
 	if err := check(p); err != nil {
 		return err
 	}
-	unlock := lockAll()
+	unlock, err := lockAll()
+	if err != nil {
+		return err
+	}
 	defer unlock()
 	s, err := load()
 	if err != nil {
@@ -178,7 +181,10 @@ func Preview(p *plan.Plan) (string, error) {
 // Restore undoes everything this tool did for agent; see the package
 // documentation.
 func Restore(agent string) (*Report, error) {
-	unlock := lockAll()
+	unlock, err := lockAll()
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	s, err := load()
 	if err != nil {
@@ -192,7 +198,10 @@ func Restore(agent string) (*Report, error) {
 // so a departing session cannot undo a newer selection. A mismatch
 // returns (nil, nil).
 func RestoreIfState(agent, key, value string) (*Report, error) {
-	unlock := lockAll()
+	unlock, err := lockAll()
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	s, err := load()
 	if err != nil {

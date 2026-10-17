@@ -56,7 +56,7 @@ func (c *Codex) Plan(t agent.Target) (*plan.Plan, error) {
 		return nil, fmt.Errorf("codex: provider %s has no model %q", p.ID, t.Model)
 	}
 	if !listed {
-		chosen = provider.Model{ID: t.Model}
+		chosen = provider.Model{ID: t.Model, Fast: provider.DefaultFast(t.Model)}
 	}
 	if t.Effort != "" {
 		if strings.ContainsAny(t.Effort, " \t\r\n") {
@@ -95,7 +95,11 @@ func (c *Codex) Plan(t agent.Target) (*plan.Plan, error) {
 
 	var edits []plan.FileEdit
 	models := catalogModels(p, chosen.ID, t.Fast)
-	if codexcat.NeedsCatalog(models) {
+	// A pre-existing custom catalog replaces Codex's bundled list too. Point
+	// to our provider catalog instead of silently keeping incompatible model
+	// capabilities; safekeep restores the original pointer, never that file.
+	existingCatalog, _ := cfg.str("model_catalog_json")
+	if codexcat.NeedsCatalog(models) || existingCatalog != "" {
 		cp := CatalogPath(p.ID)
 		next, err := codexcat.Catalog(models, appdir.CodexHome())
 		if err != nil {
@@ -120,6 +124,9 @@ func (c *Codex) Plan(t agent.Target) (*plan.Plan, error) {
 	if t.Effort != "" {
 		set("model_reasoning_effort", t.Effort)
 	}
+	if err := checkDirectProfile(cfg, top); err != nil {
+		return nil, err
+	}
 	top = append(top, plan.Op{
 		Kind: plan.SetTable, Table: "model_providers." + table, KVs: tableKVs(p), Keep: true,
 		RestoreKeys: []string{"experimental_bearer_token", "http_headers"},
@@ -133,6 +140,67 @@ func (c *Codex) Plan(t agent.Target) (*plan.Plan, error) {
 		Notice: notice(),
 		State:  map[string]string{"mode": string(agent.Direct), "provider": p.ID, "model": chosen.ID},
 	}, nil
+}
+
+// checkDirectProfile follows Magpie's legacy in-file profile check (MIT,
+// Copyright (c) 2026 yetone), internal/agent/codex.go: Check at
+// 7660399a121af67db4efd56ecb6bd4fb04dc53f1; see third_party/magpie/LICENSE. A profile
+// value wins over the top level. Preserve those profiles and reject a switch
+// they would override. Newer Codex --profile files are separate config layers;
+// this check only covers the profile selected in the config being edited.
+func checkDirectProfile(cfg config, top []plan.Op) error {
+	raw, exists := cfg.doc["profile"]
+	if !exists {
+		return nil
+	}
+	active, ok := raw.(string)
+	if !ok {
+		return errors.New("codex: profile must be a string")
+	}
+	if active == "" {
+		return nil
+	}
+	profiles, _ := cfg.doc["profiles"].(map[string]any)
+	profile, _ := profiles[active].(map[string]any)
+	conflict := func(key string) error {
+		return fmt.Errorf("codex: active legacy profile %q overrides %s; remove that override or select the default config before switching", active, key)
+	}
+	catalogEdited := false
+	for _, op := range top {
+		if op.Kind != plan.SetTop && op.Kind != plan.DelTop {
+			continue
+		}
+		if op.Key == "model_catalog_json" {
+			catalogEdited = true
+		}
+		value, exists := profile[op.Key]
+		if !exists {
+			continue
+		}
+		got, valid := value.(string)
+		if valid && op.Kind == plan.SetTop && got == op.Value {
+			continue
+		}
+		if valid && op.Key == "service_tier" {
+			// Codex accepts priority as the request spelling of Fast and
+			// default as the explicit choice of its ordinary service tier.
+			if op.Kind == plan.SetTop && op.Value == "fast" && got == "priority" ||
+				op.Kind == plan.DelTop && (got == "" || got == "default") {
+				continue
+			}
+		}
+		return conflict(op.Key)
+	}
+	if !catalogEdited {
+		// A profile catalog also replaces the built-in model list when the
+		// plan itself needs no generated catalog; its Fast data may differ.
+		if value, exists := profile["model_catalog_json"]; exists {
+			if catalog, valid := value.(string); !valid || catalog != "" {
+				return conflict("model_catalog_json")
+			}
+		}
+	}
+	return nil
 }
 
 // tableKVs is the [model_providers.qcs-<id>] table. The key goes in
@@ -172,7 +240,7 @@ func tableKVs(p provider.Provider) []edit.KV {
 func catalogModels(p provider.Provider, chosen string, fast *bool) []codexcat.Model {
 	src := p.Models
 	if len(src) == 0 {
-		src = []provider.Model{{ID: chosen}}
+		src = []provider.Model{{ID: chosen, Fast: provider.DefaultFast(chosen)}}
 	}
 	out := make([]codexcat.Model, 0, len(src))
 	for _, m := range src {

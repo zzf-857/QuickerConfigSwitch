@@ -4,9 +4,10 @@
 `HANDOFF.md` 并提交。提交历史用 `git log --oneline` 查看；未推送不代表未提交。
 测试计数只描述对应阶段的检查，不当作后续阶段的固定基线。
 
-已提交的阶段入口：A `96f94d4`，B `3865bec`，C `1ca7516`。阶段 D 随本记录
-提交，标题为 `fix: reuse Magpie relay fallback and restore provider headers`；用
-`git log --oneline` 查看最终 SHA。所有提交均在本地，不把提交完成写成已推送。
+已提交的阶段入口：A `96f94d4`，B `3865bec`，C `1ca7516`，D `f67c90c`。
+阶段 E 随本记录提交，标题为 `fix: preserve Codex Fast and fail closed on config conflicts`；
+用 `git log --oneline` 查看最终 SHA。远端交接目标为 `origin/claude/exciting-galileo-cgd4uk`，
+提交与远端状态分别以 Git 历史、远端引用为准。
 
 ## 阶段 A：安全还原与 CLI 路由（已完成）
 
@@ -61,6 +62,23 @@
   Linux 桌面构建、Windows GUI amd64/macOS CLI arm64 交叉编译全部通过。
   GTK3 运行 17 个测试包、318 个顶层测试通过；2 项按条件跳过（无第二个用户组、
   文件锁仅供子进程调用的 helper）。独立审查未发现新的明确缺陷。
+
+## 阶段 E：核心需求全面核验与修复（已完成）
+
+- 以用户要求的「保留原配置 + 官方登录 + CPA 模型 + Fast」组合审查现有代码。
+- 修复 provider 尚无模型列表时遗漏 Fast 能力；保留明确的 Fast=false 和用户原档位。
+- 直连已有自定义目录时切换到 provider 目录，保留原文件并在还原时恢复原路径。
+- 旧版活动 profile 覆盖切换计划时拒绝；兼容一致值，不改动原 profile。
+- safekeep 获取不到进程锁时 Apply/Restore/条件还原全部停止，覆盖失败零写入及重试。
+- 新增组合回归：官方模型目录/认证保持、普通及别名模型的 Responses/compact 全走
+  CPA、priority 档位透传、官方凭据隔离、原配置和登录文件身份/时间/权限保持。
+- 用官方 Codex CLI 0.159.2 的严格配置 app-server 实际验证自定义模型和 Fast 档位；
+  配置/登录均为临时夹具，未使用真实账号或请求远端 CPA。
+- 具体需求、证据、推荐模式及实际提速/账号额度等边界见 REQUIREMENTS.md。
+- 最终回归：GTK3/`nogui` 各 17 个测试包通过，324 个顶层测试通过、2 项条件跳过
+  （无第二用户组、子进程文件锁 helper）；race/vet、18 项前端测试及模块校验通过。
+  Linux GTK3 桌面构建、Windows amd64 GUI/macOS arm64 CLI 交叉编译通过。
+  `scripts/check_codex_contract.py` 可用已安装的官方客户端重复目录合同检查。
 
 ## 后续验收与优化
 

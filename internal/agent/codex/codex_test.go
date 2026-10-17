@@ -283,6 +283,50 @@ func TestPlanNoModelList(t *testing.T) {
 	}
 }
 
+// Adding a provider and using it before fetching models must not disable the
+// original Fast choice. Explicit capability/selection changes still win.
+func TestPlanUnlistedFastDefaults(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		model  string
+		models []provider.Model
+		fast   *bool
+		want   bool
+	}{
+		{name: "bundled GPT", model: "gpt-5.5", want: true},
+		{name: "vendor GPT", model: "vendor/gpt-5.5", want: true},
+		{name: "o series", model: "o3", want: true},
+		{name: "unknown", model: "other-model"},
+		{name: "explicit off", model: "gpt-5.5", fast: ptr(false)},
+		{name: "explicit on", model: "other-model", fast: ptr(true), want: true},
+		{name: "stored off", model: "gpt-5.5", models: []provider.Model{{ID: "gpt-5.5"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setup(t, fixture, tc.models...)
+			p := mustPlan(t, agent.Target{Mode: agent.Direct, Provider: "cpa", Model: tc.model, Fast: tc.fast})
+			cat, custom := catalogEdit(p)
+			if custom {
+				hasFast := strings.Contains(string(cat.Ops[0].Data), `"id": "priority"`)
+				if hasFast != tc.want {
+					t.Fatalf("catalog Fast = %v, want %v", hasFast, tc.want)
+				}
+			} else if !tc.want {
+				t.Fatal("non-Fast model did not get a catalog override")
+			}
+			if tc.fast == nil {
+				for _, op := range configEdit(t, p).Ops {
+					if op.Key == "service_tier" {
+						t.Fatal("implicit model changed original Fast selection")
+					}
+				}
+			}
+			if got, err := os.ReadFile(ConfigPath()); err != nil || string(got) != fixture {
+				t.Fatalf("planning changed original config: %v", err)
+			}
+		})
+	}
+}
+
 // (e)+(f) the table is Keep, merged (not Whole), with headers inline.
 func TestPlanTableKeepMerge(t *testing.T) {
 	setup(t, fixture+`

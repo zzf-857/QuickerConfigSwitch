@@ -15,7 +15,7 @@
 | --- | --- | --- |
 | `internal/edit` | `internal/edit` | 保格式编辑、原子写与原始值恢复；增加本项目所需的回归覆盖 |
 | `internal/filememo`、`internal/steady`、`internal/filelock` | 同名包 | 保留原有文件/进程同步实现，替换模块导入 |
-| `internal/safekeep` | 上述编辑与还原原语 | 适配 plan/stash/applied 快照及会话条件还原 |
+| `internal/safekeep` | 上述编辑与还原原语 | 适配 plan/stash/applied 快照及会话条件还原；调用方获取不到进程锁时停止，不改变上游 filelock 的通用语义 |
 | `internal/codexcat` | `internal/codexcat` | 保留模型条目/Fast 逻辑，适配本项目 provider 类型 |
 | `internal/autostart`（阶段 C） | `internal/autostart` 的 self/XDG/LaunchAgent/Run/StartupApproved | 直接裁剪平台实现，替换产品名及 `gui --hidden` 参数；增加显式 GUI 能力与已有记录保护 |
 | `internal/cli/autostart.go`（阶段 C） | `internal/cli/autostart_cli.go` | 沿用显式启停后查询系统真实记录的流程，适配本项目输出与错误码 |
@@ -32,6 +32,11 @@ Magpie 的配置适配器与网关不是直接整包复制的目标：它们还�
   以恢复用户原来的地址，并保留后来发生的其它切换，不引入其完整 daemon 管理。
 - Codex 的共享 app-server 可能跨新 CLI 会话保留 base URL 和模型目录。改配置后需确认
   对应桌面端/共享 app-server 已重启，不能仅凭“新开终端”判断新配置已生效。
+- 沿用其 GPT/o 系列 Fast 默认能力规则，补齐 provider 尚无模型列表时的隐式模型；
+  已明确保存的 Fast=false 不覆盖。旧配置内 profile 冲突保护参考 `internal/agent/codex.go`
+  的 Check；现代独立 profile 配置层仍由客户端启动方式决定。
+- 不移植完整账户额度耗尽检测或 API 状态回退；保留官方登录模式仍受客户端本身的
+  认证/额度行为影响。实际合同与核验边界见 REQUIREMENTS.md。
 
 ## 接手时的操作
 

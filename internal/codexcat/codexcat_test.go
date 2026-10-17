@@ -147,8 +147,11 @@ func TestCachePreferred(t *testing.T) {
 		t.Fatal(err)
 	}
 	own := OwnEntries(home)
-	if len(own) != 1 || own["gpt-5.5"]["base_instructions"] != "CACHED" {
-		t.Fatalf("cache not used: %d entries", len(own))
+	if own["gpt-5.5"]["base_instructions"] != "CACHED" {
+		t.Fatalf("cache not used for gpt-5.5")
+	}
+	if _, ok := own["gpt-6-sol"]; !ok {
+		t.Fatalf("bundled entries should fill slugs the cache lacks")
 	}
 	e := render(t, []Model{{Slug: "gpt-5.5", Fast: true}, {Slug: "gpt-5.5-20260914", Fast: true}}, home)
 	if e[0]["base_instructions"] != "CACHED" || !reflect.DeepEqual(tiersOf(e[0]), []string{"priority", "ultrafast"}) {

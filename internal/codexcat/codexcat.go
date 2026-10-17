@@ -132,24 +132,27 @@ func bySlug(ms []map[string]any) map[string]map[string]any {
 	return out
 }
 
-// OwnEntries are Codex's own entries by slug: from <codexHome>/models_cache.json
-// (what the ChatGPT backend gave this account, service tiers included) when it
-// parses and lists models, else the bundled catalog. The maps are the caller's
-// to change.
+// OwnEntries are Codex's own entries by slug: the bundled catalog, with each
+// entry of <codexHome>/models_cache.json (what the ChatGPT backend gave this
+// account, service tiers included) taking the place of the bundled one. The
+// maps are the caller's to change.
 func OwnEntries(codexHome string) map[string]map[string]any {
+	// the bundled catalog fills in slugs the account's cache doesn't list
+	// (a provider may serve a model this account isn't offered)
+	out := bundledEntries()
 	if codexHome != "" {
 		if b, err := os.ReadFile(filepath.Join(codexHome, "models_cache.json")); err == nil {
 			var c struct {
 				Models []map[string]any `json:"models"`
 			}
 			if json.Unmarshal(b, &c) == nil {
-				if m := bySlug(c.Models); len(m) > 0 {
-					return m
+				for k, v := range bySlug(c.Models) {
+					out[k] = v
 				}
 			}
 		}
 	}
-	return bundledEntries()
+	return out
 }
 
 var datedSuffix = regexp.MustCompile(`-(\d{4}-\d{2}-\d{2}|\d{8})$`)

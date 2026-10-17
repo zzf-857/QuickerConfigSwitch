@@ -1,3 +1,8 @@
-internal/edit, internal/filememo and internal/steady are adapted from
-yetone/magpie (https://github.com/yetone/magpie), MIT License,
-Copyright (c) yetone and magpie contributors.
+Parts of this project are adapted from third-party code:
+
+- internal/edit, internal/filememo, internal/steady, and code under
+  internal/safekeep and internal/codexcat derived from it, are adapted from
+  yetone/magpie (https://github.com/yetone/magpie), Copyright (c) 2026 yetone,
+  MIT License — see third_party/magpie/LICENSE.
+- internal/codexcat embeds Codex's bundled model catalog and system prompt from
+  openai/codex (https://github.com/openai/codex), Apache License 2.0.

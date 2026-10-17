@@ -139,7 +139,8 @@ func (e *env) cmdWeb(args []string) error {
 // none or there is no display.
 func (e *env) cmdGUI(args []string) error {
 	fs := flag.NewFlagSet("gui", flag.ContinueOnError)
-	pos, err := e.parse(fs, "qcs [gui]", args)
+	hidden := fs.Bool("hidden", false, "只启动到托盘, 不打开主窗口 (开机自启用)")
+	pos, err := e.parse(fs, "qcs [gui] [--hidden]", args)
 	if err != nil {
 		return err
 	}
@@ -150,7 +151,7 @@ func (e *env) cmdGUI(args []string) error {
 	if !hasDisplay() {
 		gerr = errors.New("没有图形显示 (DISPLAY / WAYLAND_DISPLAY 为空)")
 	} else {
-		gerr = runGUI()
+		gerr = runGUI(*hidden)
 	}
 	if gerr != nil {
 		fmt.Fprintf(e.err, "qcs: 无法打开桌面界面: %v\n", gerr)

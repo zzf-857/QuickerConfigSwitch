@@ -34,9 +34,11 @@ const (
 var focusMain atomic.Value
 
 // Run starts the desktop app: a tray icon whose click toggles a compact
-// panel, and a main window that hides on close. It returns when the user
-// quits from the tray menu.
-func Run() error {
+// panel, and a main window that hides on close. The main window opens at
+// start unless hidden (an autostart): many Linux desktops (GNOME without an
+// extension) show no tray icons at all, and the app must still be usable
+// there. It returns when the user quits from the tray menu.
+func Run(hidden bool) error {
 	app := application.New(application.Options{
 		Name:        appName,
 		Description: "Switch Codex / Claude Code between official setup and custom providers",
@@ -66,7 +68,7 @@ func Run() error {
 	}
 
 	panel := app.Window.NewWithOptions(panelOptions())
-	main := app.Window.NewWithOptions(mainOptions())
+	main := app.Window.NewWithOptions(mainOptions(hidden))
 
 	showMain := func() {
 		application.InvokeAsync(func() {
@@ -131,7 +133,7 @@ func panelOptions() application.WebviewWindowOptions {
 	return o
 }
 
-func mainOptions() application.WebviewWindowOptions {
+func mainOptions(hidden bool) application.WebviewWindowOptions {
 	return application.WebviewWindowOptions{
 		Name:      "main",
 		Title:     appName,
@@ -140,6 +142,6 @@ func mainOptions() application.WebviewWindowOptions {
 		Height:    mainH,
 		MinWidth:  720,
 		MinHeight: 480,
-		Hidden:    true,
+		Hidden:    hidden,
 	}
 }

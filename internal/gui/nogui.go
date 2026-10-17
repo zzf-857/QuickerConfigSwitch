@@ -7,6 +7,6 @@ package gui
 import "errors"
 
 // Run reports that this build has no GUI.
-func Run() error {
+func Run(hidden bool) error {
 	return errors.New("这个构建不含桌面界面 (nogui); 请用 qcs web 在浏览器中打开")
 }

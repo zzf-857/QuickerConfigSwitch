@@ -192,17 +192,17 @@ func TestNoArgsRunsGUI(t *testing.T) {
 	t.Cleanup(func() { runGUI, hasDisplay = oldRun, oldDisp })
 
 	hasDisplay = func() bool { return true }
-	runGUI = func() error { return nil }
+	runGUI = func(bool) error { return nil }
 	if code, _, _ := run(t, ""); code != 0 {
 		t.Fatalf("code %d", code)
 	}
-	runGUI = func() error { return errors.New("nope") }
+	runGUI = func(bool) error { return errors.New("nope") }
 	code, _, errs := run(t, "", "gui")
 	if code != 1 || !strings.Contains(errs, "nope") || !strings.Contains(errs, "qcs web") {
 		t.Fatalf("code %d err %s", code, errs)
 	}
 	hasDisplay = func() bool { return false }
-	runGUI = func() error { t.Fatal("gui started without a display"); return nil }
+	runGUI = func(bool) error { t.Fatal("gui started without a display"); return nil }
 	code, _, errs = run(t, "")
 	if code != 1 || !strings.Contains(errs, "qcs web") {
 		t.Fatalf("code %d err %s", code, errs)

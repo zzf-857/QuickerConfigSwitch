@@ -5,13 +5,17 @@
 
 ## 1. 一句话现状
 
-CLI 核心、图形界面、方案和导入已完成；Claude Desktop 有独立 3p 入口，模式 R 有 CLI、GUI/Web、托盘生命周期管理和可选登录自启。用户主场景是 **CPA 统一管理官方订阅，QCS 配置 Codex 直连**：无需本机 ChatGPT 登录或额外 QCS 路由，保留 GPT 原名、完整模型元数据及 Fast。Magpie 的上游订阅签名与客户端 provider 是两层，见 [CODEX_SUBSCRIPTION.md](CODEX_SUBSCRIPTION.md)。此前将本机官方登录列为模型/Fast 的前提，已在阶段 I 纠正。仅额外需要本机活动官方 provider/会话时考虑模式 R。官方 Codex CLI 0.159.2 已用无登录临时配置实际发出原模型 ID 和 priority 请求；真实 CPA、桌面及账号验收仍见 ACCEPTANCE.md。
+CLI 核心、图形界面、方案和导入已完成；Claude Desktop 有独立 3p 入口，模式 R 有 CLI、GUI/Web、托盘生命周期管理和可选登录自启。Codex 有两个明确组合：**登录只在 CPA** 时用直连 D；**本机保留真实官方登录、对话和上下文压缩仍全部走 CPA** 时用本地路由 R All。后者不必把对话改回官方通道，但目录、搜索和账号等官方功能仍可能访问官方。两种模式保留 GPT/Fast 的配置逻辑，Magpie 的依据与账号归属见 [CODEX_SUBSCRIPTION.md](CODEX_SUBSCRIPTION.md)。实际官方 CLI 的隔离合同不能替代真实 CPA、桌面及账号验收，步骤见 ACCEPTANCE.md。
 
 用户当前提供的版本为 **CPAMP 1.14.7 / CLIProxyAPI 内核 8.0.32**，已核对对应公开
 标签，见 CODEX_SUBSCRIPTION.md。面板不转发模型请求；8.0.32 内核有订阅 OAuth、
 完整 Codex 模型目录和 priority 处理，但部署的路由/参数覆盖仍待检查。Magpie 也没有
 模拟全部官方身份与路径；QCS 当前证明的是模型/Fast 请求能力，不能将无本机登录时
 与官方账号完全一致的体验标为完成。真实实例未连接，不读取或索取 OAuth 凭据。
+
+保留本机官方登录时，CPA 使用的上游账号可与本机账号不同，额度归属也不同。
+R All 的 Responses/compact 失败不会自动回退到官方推理；本机认证失效或客户端
+本机额度阻断仍可能影响发送。`openai_base_url` 不覆盖独立的 `chatgpt_base_url`。
 
 ## 2. 已完成的功能
 
@@ -75,6 +79,7 @@ make cli
 - 阶段 G：Claude CLI 补齐云/子代理/后台模型/元数据、精确 ID、自定义请求头和显式 effort/上限；拒绝空认证导致官方 OAuth 传到第三方的路径。官方 CLI 2.1.302 六项临时本地请求检查通过。
 - 阶段 H：独立 Claude Desktop 3p 适配、Magpie 多平台/MSIX 路径、服务端兼容模型筛选和界面卡片完成；真实后端 Chromium 取消/确认/还原及权限流程通过。最终 GTK3/`nogui` 各 20 个测试包、368 个顶层测试通过、2 个条件跳过，19 项前端测试通过；两种 vet、依赖校验与三平台构建通过。两个官方 CLI 合同脚本在最终构建重跑通过。
 - 阶段 I：CPA 代管订阅的直连作为主场景，不要求本机登录；修复纯原生模型列表多列内置模型和 fetch 占位名覆盖官方名称。官方 Codex 无登录实际模型/Fast/priority 请求与还原合同加入永久脚本，五例全通过。GTK3/`nogui` 各 20 包、370 个顶层测试通过、2 个条件跳过；两种 race/vet、19 项前端测试、模块校验和三平台构建通过。真实后端 Chromium 验证直连说明/路由切换及 Desktop 往返。源码链路及真机边界见 CODEX_SUBSCRIPTION.md。
+- 阶段 K：明确本机官方登录与 CPA 模型通道并存的 R All；界面/预览说明对话和压缩走 CPA，原名可选且失败不自动切官方。新增永久联合合同：官方 CLI 识别合成 ChatGPT 状态、原生模型/Fast，一次实际 Responses 只到假 CPA，认证文件保持并精确还原。`nogui` 全量 race/vet、370 个顶层测试通过（另 2 条件跳过）、19 项前端与 Chromium、Linux GTK3/CLI 和 Windows GUI/macOS CLI 构建通过。测试命令见 CODEX_SUBSCRIPTION.md；真实账号/桌面与 compact native 请求未因此标为验收。
 
 ## 4. 代码地图
 

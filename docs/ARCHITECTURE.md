@@ -320,7 +320,8 @@ MSIX 不同版本的两套目录分别记录原值，界面用服务端 ModelRef
 | `GET /backend-api/codex/models` | 用请求里的原始头（Authorization、ChatGPT-Account-Id）向 `chatgpt.com` 取官方列表 → 追加自定义模型条目（由 codexcat 生成，带 `service_tiers`）→ 返回 |
 | `POST /backend-api/codex/responses`、`/responses/compact` | 读 `model`：「并存」且为官方 slug → **原样**转发 chatgpt.com（body 里的 `service_tier` 不动 → 订阅 Fast 正常）；自定义模型（`cpa/gpt-5.5`）或「全走上游」→ 改写 `model`、换成 provider 的 key、去掉 ChatGPT 专用头 → 转发到 `{baseURL}/responses`（或 `/responses/compact`）；SSE 流原样回传 |
 | WebSocket 升级 | 回 426，让 Codex 退回 HTTP（magpie 同样做法） |
-| 其它路径（如 `/wham/usage`） | 原样转发 chatgpt.com |
+| 其它 `/backend-api/codex/*` 路径（含 `/alpha/search`） | 原样转发 chatgpt.com；不属于全走上游的 Responses/compact |
+| 独立的账号/额度请求 | 由 Codex 自己的 `chatgpt_base_url` 和本机认证处理，不受 `openai_base_url` 改动控制 |
 
 安全与可靠性：
 
@@ -331,6 +332,10 @@ MSIX 不同版本的两套目录分别记录原值，界面用服务端 ModelRef
 CLI 使用 `qcs use codex <provider>/<model> --relay` 前台持有路由；GUI/Web 和托盘由同一进程的 `core.RelayController` 管理。`core.PrepareRelay` 先获取进程锁、预留 loopback 端口并生成预览；用户确认后 `Start` 再检查配置和 provider 是否变化，交由 `safekeep.Apply` 写入。GUI/Web 返回预留会话的一次性确认 ID，取消或两分钟过期释放；Wails 同步退出钩子和 Web 服务停止均关闭控制器。退出通过会话标记的条件还原，避免撤销其它进程后来做出的切换。异常退出释放系统文件锁，下一次启动可接管原有快照，也可显式执行 `qcs relay recover`。
 
 路由不自动改变当前模型或 Fast 设置；并存模式将 `<provider>/<model>` 别名追加到官方目录，并在转发时去掉前缀。第三方请求采用独立的头部集合，不携带官方请求中的登录、账户或 cookie。HTTP/SSE 直接转发，不跟随上游重定向。运行中的路由不能通过普通方案保存或启动。
+
+全走上游时可直接在 Codex 选原始模型名，保留内置 OpenAI provider 和真实本机登录。
+Responses/compact 的 CPA 失败直接返回，不会改用本机订阅补跑。账号状态与模型调用
+分开：本机显示的额度不代表 CPA 实际使用的账号，客户端的登录/额度限制仍可能阻止发起请求。
 
 Codex 在官方 provider + ChatGPT 登录时默认启用 zstd 请求压缩（`codex-rs/core/src/client.rs` 的 `responses_request_compression`）。路由对压缩前后正文都设大小限制，解压读取模型；官方请求继续使用原始压缩字节，第三方请求使用去前缀后的 JSON 并移除编码头。第三方查询参数不透传，3xx 返回 502，避免客户端绕过路由向新地址转发账户头。
 

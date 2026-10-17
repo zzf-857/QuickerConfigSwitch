@@ -22,6 +22,12 @@ ID、认证、effort 及上限；可用
 重做临时配置、目录及假 SSE 请求检查；该脚本不登录账号，不访问真实 CPA 或进行
 真实模型推理。
 
+另有保留 ChatGPT 客户端状态与 CPA 分流的联合合同：先用
+`go build -tags nogui -o /tmp/qcs-relay-fixture ./scripts/fixtures/codex-relay` 构建测试夹具，
+再运行 `python3 scripts/check_codex_relay_contract.py --qcs ./qcs --codex /path/to/codex --relay-fixture /tmp/qcs-relay-fixture`。
+该测试仅使用临时合成登录和 loopback；真实 Codex 识别 ChatGPT 状态且原名/Fast
+保留、实际请求仅交给假 CPA。Linux 0.159.2 证据不替代真实账号或桌面验收。
+
 ## 当前证据
 
 | 项目 | Linux | Windows | macOS |
@@ -68,6 +74,10 @@ ID、认证、effort 及上限；可用
    “请求有 priority”替代真实上游接受档位的证据。若订阅额度耗尽导致桌面端不发送，
    单独记录；本工具没有实现 Magpie 完整额度检测/API 状态回退。这是保留本机
    官方 provider 的路由场景边界，不应作为无本机登录的模式 D 的前置要求。
+   对 R All 另行记录 `account/read`（关闭 refreshToken）的账号类型仍为 `chatgpt`、
+   内置 provider 不变，且原名 GPT 的一次实际 Responses 请求仅由 CPA 承接、带 priority。
+   本机账号与 CPA 实际所用账号可不同，应分别记录身份/额度归属。CPA 失败时应直接
+   报错，不自动消耗本机订阅；目录、搜索与其它官方请求仍可能访问官方，不能混称全网络 CPA。
 4. **多窗口与进程**：主窗口和托盘面板显示相同状态；外部 CLI 持有的路由不能被
    当前窗口错误停止。退出持有路由的应用/服务会还原，关 Web 标签不会停止已运行
    的路由。强制结束后再次启动接管，或显式恢复残留配置。

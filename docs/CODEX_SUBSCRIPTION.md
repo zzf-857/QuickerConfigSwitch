@@ -1,14 +1,20 @@
 # Codex 官方订阅、CPA 与 Fast
 
-主场景是：**官方 OAuth 和订阅账号由 CPA 管理，QCS 只把 Codex 指向 CPA；
-Codex 本机可以没有官方登录，仍能选择 GPT 模型、推理强度和 Fast。**
-这条路径使用直连配置，不要求额外运行 QCS 本地路由。
+**保留本机真实 ChatGPT 登录，不要求把模型请求改回官方。** 可按凭据归属选择：
+
+| 方案 | 客户端登录与模型通道 |
+| --- | --- |
+| D：仅 CPA 管理订阅 | CPA 保存 OAuth；Codex 用 CPA key 直连，本机可无登录，QCS 不需常驻 |
+| R All：保留本机官方登录，模型请求全 CPA | 本机保持真实 ChatGPT 登录与内置 `openai`；QCS 常驻路由将 Responses/compact 全部交给 CPA |
+
+两种方案都可保留 GPT 模型名、推理强度和 Fast。方案 D 的官方订阅由 CPA 管理；
+方案 R All 还保留客户端自己的账号身份，具体分流如下文所述。
 
 上游使用官方订阅、客户端展示完整模型能力、客户端自身的账号登录状态是三个层次。
 模型和 Fast 能力不以本机保存 ChatGPT 登录为前提；账户中心、官方 provider 下的
 会话和其它账号功能则需要分别确认，不能用模型请求成功代替验收。
 
-## 使用方式
+## 方案 D：CPA 管理订阅，客户端直连
 
 先在 CPA 中配置实际的官方账号和可用模型，再在 QCS 中添加 CPA：
 
@@ -27,6 +33,56 @@ qcs use codex cpa/gpt-5.5
 选择 CPA 实际列出的精确模型名；QCS 不把任意别名擅自转换成官方模型。
 还原使用 `qcs use codex official`，恢复切换前的配置。若切换前没有本机登录，
 还原后仍没有本机登录；该命令不执行 OAuth 或注销。
+
+## 方案 R All：本机官方登录与 CPA 模型通道并存
+
+先由 Codex 自己完成真实 ChatGPT 登录，并准备好 CPA provider，再运行：
+
+```sh
+qcs use codex official                         # 先还原此前的直连配置
+qcs use codex cpa/gpt-5.5 --relay --relay-all   # 预览确认后保持进程运行
+```
+
+重启 Codex 桌面端及共享 app-server，再打开新 CLI 会话。在 Codex 内可直接选
+`gpt-5.5`，无需改选 `cpa/gpt-5.5`；CPA 必须实际支持这个原名。Fast 和推理档位仍在
+Codex 内选择。停止路由会还原地址，随后需再次重启客户端。
+
+此模式保留内置 `openai` provider，只临时设置 `openai_base_url`，不替换官方登录。
+客户端的本机账号与 CPA 保存的 OAuth 独立，可以是不同账号：本机账号界面和额度
+反映本机身份，模型消耗归 CPA 实际选用的账号，不能用前者推断后者的额度。
+
+| 请求 | R All 的去向 |
+| --- | --- |
+| `GET /backend-api/codex/models` | 获取官方目录并追加 provider 别名；目录不可用时按既有缓存回退，官方 401/403 保持可见 |
+| `POST /backend-api/codex/responses`、`/responses/compact` | 全部到 CPA，包括原名 `gpt-5.5`；使用 CPA key，隔离本机官方认证；CPA 出错时 QCS 不自动改走官方模型通道 |
+| 同前缀其它路径，包括 `/alpha/search` | 仍到官方后端，保留该官方请求的认证 |
+| 由独立 `chatgpt_base_url` 控制的账号/额度请求 | 保持客户端原官方地址，不由 `openai_base_url` 改到 CPA |
+
+因此“全走 CPA”限定为 Responses/compact 模型通道；模型目录、搜索和其它官方功能
+仍可能连接官方。本机登录须有效；官方认证失败或客户端因本机额度限制而停止发起
+请求时，QCS 不承诺绕过。未加 `--relay-all` 的并存模式则按模型前缀分流，原名仍走官方。
+
+配置与分流规则见 [`relayPlan`](../internal/agent/codex/relay.go)、
+[`internal/relay`](../internal/relay/relay.go)。这是对固定版本
+[Magpie `codexIn`][magpie-wiring] 保留本机登录的地址覆盖配置的裁剪；不复制其账号写入、账户池或完整
+额度回退逻辑。真实账号与桌面行为按 [ACCEPTANCE.md](ACCEPTANCE.md) 验收。
+
+可重跑保留登录与 CPA 分流的联合合同（Go 1.26、Python 3.11+、官方 Codex；当前在
+Linux/Codex 0.159.2 验证；该脚本依赖 POSIX 信号清理，不支持 Windows 复跑）：
+
+```sh
+go build -tags nogui -o /tmp/qcs-relay-fixture ./scripts/fixtures/codex-relay
+python3 scripts/check_codex_relay_contract.py --qcs ./qcs --codex /path/to/codex \
+  --relay-fixture /tmp/qcs-relay-fixture
+```
+
+专用夹具运行真实 `core.StartRelay(All=true)`，只在测试进程把官方目标映射到本地假
+服务，拒绝其它出网；实际客户端的独立账号地址同样指向本地假服务。`account/read`
+识别临时合成登录为 `chatgpt`，`requiresOpenaiAuth=true`；内置 `openai`、GPT 原名和
+Fast 保留。一次真实客户端 turn 由假 SSE 完成，仅 CPA 收到原模型与 `priority`，
+官方模型目录请求仍使用夹具官方认证。停止后原配置逐字节还原，登录文件的内容、
+身份、时间和权限不变。这证明客户端状态和分流合同，不证明假登录真实有效、桌面
+账号功能或真实 CPA 的订阅档位。夹具不属于产品入口，不提供修改真实官方目标的参数。
 
 ## Magpie 的实现依据
 
@@ -132,9 +188,8 @@ python3 scripts/check_codex_contract.py --qcs ./qcs --codex /path/to/codex
 
 ## 其它官方能力的边界
 
-如需继续使用本机官方账号功能，可选择现有「本地路由」模式；它保留内置 OpenAI
-provider 和客户端登录，模型请求可全走 CPA。此模式解决另一类需求，不是上述
-CPA 统一管理订阅、客户端无登录也能使用 GPT/Fast 的前提。
+本机官方登录与模型通道的关系见上面的方案 R All；其分流范围不能等同于全部官方
+功能都由 CPA 提供。方案 D 则让 CPA 管理订阅，客户端无需本机官方身份。
 
 Magpie 的 [`putProvider`][magpie-actor] 还写入 `x-openai-actor-authorization`，让
 Codex 提供 `image_gen` 等 OpenAI actor 工具。这与模型目录、Fast 和本机 OAuth 登录

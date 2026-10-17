@@ -8,7 +8,7 @@ Codex CLI、ChatGPT/Codex Desktop、Claude CLI 和 Claude Desktop 的逐端支�
 
 ## 推荐使用方式
 
-用户的主场景是**官方订阅登录、刷新与账号选择都交给 CPA，QCS 只配置 Codex 直连 CPA**。
+若**官方订阅登录、刷新与账号选择都交给 CPA**，QCS 配置 Codex 直连 CPA。
 Magpie 也将网关上游的 Codex 官方订阅与客户端的 provider 配置分开；完整源码链路见
 [CODEX_SUBSCRIPTION.md](CODEX_SUBSCRIPTION.md)。本机无需 ChatGPT 登录，模型和 Fast
 也不要求 QCS 本地路由。对应 CLI：
@@ -25,9 +25,13 @@ qcs use codex cpa/gpt-5.5 --fast # 也可在客户端选 Fast；不传则保留�
 指令、推理档位和 Fast。未拉取列表时仍可用已知模型，但选择器可能展示内置的其它模型，
 因此建议先拉取 CPA 实际提供的列表。
 
-如果还需要本机活动的官方 provider、官方 provider 下的会话或登录专属功能，再考虑可选
-本地路由 `--relay [--relay-all]`，它需常驻且保留本机登录。该需求与 CPA 使用官方订阅、
-客户端有模型/Fast 是不同层面，不应把本机登录当作后两者的前提。
+本轮继续核验另一组合：**本机保留真实官方登录，Responses/compact 全部走 CPA**。
+使用 `qcs use codex cpa/gpt-5.5 --relay --relay-all` 并保持路由运行。重启客户端后
+可直接选原名 `gpt-5.5`，无需切成自定义 provider 或选择带前缀的别名。
+此时客户端账号功能用本机登录，模型请求改用 CPA key，由 CPA 决定使用哪个上游账号。
+CPA 出错不会自动回退到官方推理；模型目录、搜索和其它官方路径仍访问官方。
+本机账号的额度 UI 不代表 CPA 池中账号的额度；部分 Desktop 版本仍可能先按本机
+账号额度阻止发送。这与无本机登录直连是两种不同的配置选择，不能互相代替。
 
 ## 要求与证据
 

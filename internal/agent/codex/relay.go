@@ -73,6 +73,11 @@ func (c *Codex) relayPlan(t agent.Target) (*plan.Plan, error) {
 			}
 		}
 	}
+	choice := "在 Codex 模型选择器中选择 " + p.ID + "/" + t.Model + "。"
+	if t.RelayAll {
+		choice = "在 Codex 内选择上游实际支持的原模型名（如 " + t.Model + "），无需 provider 前缀。" +
+			"Responses 对话和上下文压缩请求全部走 " + p.ID + "，失败不会自动改用官方模型通道。"
+	}
 	return &plan.Plan{
 		Agent: ID,
 		Edits: []plan.FileEdit{{Path: ConfigPath(), Format: plan.TOML, Ops: []plan.Op{
@@ -83,7 +88,7 @@ func (c *Codex) relayPlan(t agent.Target) (*plan.Plan, error) {
 			"relay_url": t.RelayURL, "relay_all": strconv.FormatBool(t.RelayAll),
 		},
 		Notice: "保持此进程运行，并重启 Codex 桌面端及仍在运行的共享 app-server，再打开新 CLI 会话。" +
-			"在 Codex 模型选择器中选择 " + p.ID + "/" + t.Model + "；Fast 和推理强度仍由 Codex 控制。" +
+			choice + "保留本机官方登录；Fast 和推理强度仍由 Codex 控制。模型目录、搜索及其它官方路径仍走官方。" +
 			"停止路由后自动还原地址，需再次重启 Codex。auth.json 没有被修改。" +
 			"使用代理时请让 127.0.0.1 直连：环境代理的 NO_PROXY 应包含 127.0.0.1，系统代理需设置本地地址绕过。qcs doctor 可检查当前进程的环境代理。",
 	}, nil

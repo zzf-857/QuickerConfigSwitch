@@ -7,8 +7,8 @@
 
 | 客户端 | qcs ID | 配置与模式 | 登录边界 |
 | --- | --- | --- | --- |
-| Codex CLI | `codex` | `CODEX_HOME/config.toml`，默认 `~/.codex/config.toml`；优先使用单一 provider 直连，可选本地路由 | CPA 持有订阅 OAuth 时，直连只需 CPA 访问密钥；本机无需 ChatGPT 登录。已有登录文件保留 |
-| ChatGPT/Codex Desktop | `codex` | 与 Codex CLI 共用配置，不重复建立第二份配置 | 同上；本机账号界面和会话历史按 provider 隔离是另一项边界，改配置后需退出桌面端及共享 app-server |
+| Codex CLI | `codex` | `CODEX_HOME/config.toml`，默认 `~/.codex/config.toml`；CPA 管理订阅用直连，保留本机登录且模型全 CPA 用 R All | 直连无需本机登录；R All 保持内置官方 provider 和真实本机登录，模型通道使用 CPA key |
+| ChatGPT/Codex Desktop | `codex` | 与 Codex CLI 共用配置，不重复建立第二份配置 | 直连的账号界面及历史按 provider 隔离；R All 保留内置官方 provider。改配置后需退出桌面端及共享 app-server |
 | Claude Code CLI | `claude` | `CLAUDE_CONFIG_DIR/settings.json`，默认 `~/.claude/settings.json`；单一 provider 直连 | 不改官方登录文件，切回原配置后恢复使用；直连要求明确的第三方认证 |
 | Claude Desktop | `claude-desktop` | 原目录与 `Claude-3p` 的部署模式、独立 gateway profile；支持 Code/Cowork 的 3p 配置 | 保留原登录数据，3p 期间使用独立数据目录，不使用官方 Anthropic 登录 |
 
@@ -54,11 +54,15 @@ Fast 有两项独立证据：客户端目录保留 Fast 档位，以及实际 Re
 切回官方后恢复原配置及其原有登录使用方式；保留的 provider 定义用于打开其历史会话，
 qcs 写入的密钥仍按所有权记录撤销。
 
-只有另需保留**本机活动官方 provider / 登录态**，并让本机官方模型与 CPA 模型并存时，
-才选择可选的模式 R。本机 Codex 经常驻 QCS 路由分流；`--relay-all` 把模型请求都发到
-CPA，其它官方路径仍使用本机官方配置。此模式的本机认证、目录请求和额度限制见
-[REQUIREMENTS.md](REQUIREMENTS.md)，不能套用到上面的无本机登录直连场景。
-两种凭据归属与操作说明见 [CODEX_SUBSCRIPTION.md](CODEX_SUBSCRIPTION.md)。
+另需保留**本机真实 ChatGPT 登录**，同时让 Responses/compact 全走 CPA，可选择
+R All：保持内置 `openai`，只临时修改 `openai_base_url`，由 QCS 常驻路由转发。
+在 Codex 内仍可选择原名 `gpt-5.5`，无需 provider 前缀；CPA 出错时不会自动改走
+官方模型通道。官方模型目录加本地别名、搜索等其它官方路径仍走官方；账号/额度
+使用独立的 `chatgpt_base_url`。本机账号与 CPA OAuth 可以不同，界面身份及模型
+实际消耗分别归属各自账号；本机登录有效性和客户端额度阻断仍需单独确认。
+
+不加 `--relay-all` 的模式 R 则保留按模型前缀分流。两方案命令、精确路径表及
+固定版本 Magpie/本地实现依据见 [CODEX_SUBSCRIPTION.md](CODEX_SUBSCRIPTION.md)。
 
 ## Claude CLI 的单一配置行为
 

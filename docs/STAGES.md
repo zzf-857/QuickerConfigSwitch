@@ -6,7 +6,7 @@
 
 已提交的阶段入口：A `96f94d4`，B `3865bec`，C `1ca7516`，D `f67c90c`。
 阶段 E 为 `6893f29`，F 为 `9a5a6ff`，G 为 `3d3c17b`，H 为 `e5f55eb`。
-阶段 I 为 `67bf339`，阶段 J 随本记录提交，最终 SHA 用 `git log --oneline` 查看。
+阶段 I 为 `67bf339`，J 为 `09ce0d7`。阶段 K 随本记录提交，最终 SHA 用 `git log --oneline` 查看。
 远端交接目标为 `origin/claude/exciting-galileo-cgd4uk`，
 提交与远端状态分别以 Git 历史、远端引用为准。
 
@@ -166,10 +166,32 @@
   不改应用代码，不重复应用测试，不连接用户 CPA、不发真实模型请求或读取凭据。
   真实部署路由、参数规则及最终档位仍按 ACCEPTANCE.md 验收。
 
+## 阶段 K：保留本机官方登录且模型通道继续走 CPA（已完成）
+
+- 对照 Magpie 的地址覆盖/真实登录分层，明确 R All 保留内置 `openai` 和已有登录，
+  只改 `openai_base_url`；原名 GPT 的 Responses/compact 固定走 CPA，不自动回退官方。
+  目录、搜索及其它官方路径仍访问官方，账号/额度还由独立 `chatgpt_base_url` 控制。
+- 修正界面“全部请求走第三方”的过宽名称，改为对话/上下文压缩；All 模式的切换
+  提示允许直接选原模型名，不再要求 provider 前缀。同步两种方案与本机/CPA 账号额度归属。
+- 新增 `check_codex_relay_contract.py` 与测试专用 Go fixture。夹具使用真实
+  `core.StartRelay(All=true)`，把官方目标限制到假 loopback，禁止其它目标；强制临时
+  HOME/QCS_HOME/CODEX_HOME，实际客户端同样隔离且不能访问远端。
+- 官方 Codex 0.159.2 实际 `account/read` 保持合成 ChatGPT Pro 状态和
+  `requiresOpenaiAuth=true`；内置 OpenAI、GPT 原名与 Fast 保留。一次真实 turn
+  只向假 CPA 发送原名、priority 与 CPA key；官方目录仍用原夹具认证，官方未收到
+  Responses。登录文件内容/inode/mtime/权限不变，正常停止后原配置逐字节还原。
+  native 合同实际触发的是 Responses；compact 分流继续由已有 Go 回归覆盖。
+- 验证：`nogui` 全量 race 20 个测试包、370 个顶层测试通过、2 项条件跳过；全量 vet、
+  19 项前端测试、真实后端 Chromium 往返通过。Linux CLI/GTK3、Windows amd64 GUI、
+  macOS arm64 CLI 构建通过。最终 CLI 与测试 fixture 的联合客户端合同通过。
+- 原五例直连脚本不变；新脚本命令和验收边界记录在 CODEX_SUBSCRIPTION.md、
+  ACCEPTANCE.md。合成登录只证明客户端状态与分流，不代表真实账号、Desktop、
+  CPAMP 部署或优先档位已经验收，不移植 Magpie 的真实凭据写入与额度回退。
+
 ## 后续验收与优化
 
-- 优先验收真实 CPA 持有订阅、本机无登录的 Codex Desktop 直连模型/Fast；再按需验收
-  本机官方登录路由、HTTP 回退、三平台托盘面板和登录自启。
+- 分别验收两种 Codex Desktop 组合：仅 CPA 持有订阅的直连，以及本机保留登录、
+  对话/压缩全走 CPA 的 R All；再验收 HTTP 回退、三平台托盘面板和登录自启。
 - GUI 方案编辑和 provider 连接测试；之后再评估系统钥匙串、会话迁移和新 Agent。
 - 真机或凭据不可用时记录具体未验证项，继续独立工作，不把它们标成通过。
 - 具体验收步骤与当前平台证据见 [ACCEPTANCE.md](ACCEPTANCE.md)。后续优先查阅

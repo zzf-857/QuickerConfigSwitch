@@ -76,6 +76,29 @@ Magpie 的 [`codexIn`][magpie-wiring] 同时实现两条客户端路径：有本
 实现入口为 `internal/agent/codex/plan.go`、`internal/codexcat/codexcat.go`；
 备份、原子写入和漂移保护仍统一由 `internal/safekeep` 负责。
 
+## CPAMP 1.14.7 / CLIProxyAPI 8.0.32 版本核验
+
+用户自报 CPAMP `1.14.7`、内核 `8.0.32`；已核对原版 tag：
+`seakee/CPA-Manager-Plus v1.14.7` 为 `64ce94e6aa1af691555429a3211e67c59c0480ad`，
+`router-for-me/CLIProxyAPI v8.0.32` 为 `911f49cbd49f4fe2516979754a7488a3fd14fe64`。
+CPAMP 的 Plus 是管理面板名称，其[运行模型][cpamp-runtime]说明客户端直接连接 CPA；
+[版本链接映射][cpamp-versions]也指向 CLIProxyAPI，不能据名称推断内核为 CLIProxyAPIPlus。
+面板与内核独立升级，CPAMP 版本本身不固定内核版本。
+
+| 核验项 | 8.0.32 原版源码行为 |
+| --- | --- |
+| 官方订阅鉴权 | 有 [Codex OAuth 交换/刷新实现][cpa-oauth]，executor 使用上游账户 token；客户端连接 CPA 使用 CPA 普通 API key |
+| 模型与压缩请求 | 已注册 `POST /v1/responses`、`POST /v1/responses/compact`，以及 `/backend-api/codex` 下对应别名，见[路由注册][cpa-routes] |
+| 完整 Codex 目录 | `GET /v1/models?client_version=<客户端版本>` 返回 Codex 目录；不带该参数通常返回四字段 OpenAI 模型列表，见 [`OpenAIModels`][cpa-models] |
+| Fast 能力限制 | 目录基于 registry、模型模板和路由生成；非纯 Codex provider 的模型会清空 `service_tiers`，见[能力约束][cpa-model-caps] |
+| 官方路径缺口 | `/backend-api/codex` 只有 Responses、compact、search 等明确别名，没有该前缀下的 `/models` 或通配官方转发；不能直接当作 Magpie 的完整前缀代理 |
+| 实际 Fast 参数 | 转换器保留 priority/ultrafast、将 fast 转为 priority；管理员 [payload override/filter][cpa-payload-rules] 仍可覆盖或删除该字段 |
+
+这是用户自报版本与原版源码的对应核验，尚未连接用户部署。目录不是对每个官方账号
+实时查询的订阅权限清单；模型列出、Fast 可选都不能保证该次路由实际有权限或使用优先档位。
+QCS 当前从普通 `/v1/models` 获取 ID，再复用本地完整模型条目，不自动读取上述参数化
+目录。本机账号 UI 仍取决于客户端的真实认证状态，CPA key 不生成本机 ChatGPT 登录。
+
 ## 官方 Codex CLI 的五项隔离验证
 
 检查程序为 [`scripts/check_codex_contract.py`](../scripts/check_codex_contract.py)，
@@ -135,3 +158,10 @@ header；[`isImageGenerationFunctionTool`][cpa-image] 认识 Codex 的 namespace
 [magpie-actor]: https://github.com/yetone/magpie/blob/7660399a121af67db4efd56ecb6bd4fb04dc53f1/internal/agent/codex.go#L395
 [cpa-headers]: https://github.com/router-for-me/CLIProxyAPI/blob/911f49cbd49f4fe2516979754a7488a3fd14fe64/internal/runtime/executor/codex_executor_request.go#L242
 [cpa-image]: https://github.com/router-for-me/CLIProxyAPI/blob/911f49cbd49f4fe2516979754a7488a3fd14fe64/internal/runtime/executor/codex_executor_request.go#L418
+[cpamp-runtime]: https://github.com/seakee/CPA-Manager-Plus/blob/64ce94e6aa1af691555429a3211e67c59c0480ad/apps/docs/guide/runtime-model.md#L3
+[cpamp-versions]: https://github.com/seakee/CPA-Manager-Plus/blob/64ce94e6aa1af691555429a3211e67c59c0480ad/apps/web/src/features/dashboard/versionReleaseLinks.ts#L3
+[cpa-oauth]: https://github.com/router-for-me/CLIProxyAPI/blob/911f49cbd49f4fe2516979754a7488a3fd14fe64/internal/auth/codex/openai_auth.go#L96
+[cpa-routes]: https://github.com/router-for-me/CLIProxyAPI/blob/911f49cbd49f4fe2516979754a7488a3fd14fe64/internal/api/server_routes.go#L63
+[cpa-models]: https://github.com/router-for-me/CLIProxyAPI/blob/911f49cbd49f4fe2516979754a7488a3fd14fe64/sdk/api/handlers/openai/openai_handlers.go#L64
+[cpa-model-caps]: https://github.com/router-for-me/CLIProxyAPI/blob/911f49cbd49f4fe2516979754a7488a3fd14fe64/internal/client/codex/models/models.go#L561
+[cpa-payload-rules]: https://github.com/router-for-me/CLIProxyAPI/blob/911f49cbd49f4fe2516979754a7488a3fd14fe64/internal/runtime/executor/helps/payload_helpers.go#L155

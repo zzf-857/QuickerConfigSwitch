@@ -7,6 +7,12 @@
 
 CLI 核心、图形界面、方案和导入已完成；Claude Desktop 有独立 3p 入口，模式 R 有 CLI、GUI/Web、托盘生命周期管理和可选登录自启。用户主场景是 **CPA 统一管理官方订阅，QCS 配置 Codex 直连**：无需本机 ChatGPT 登录或额外 QCS 路由，保留 GPT 原名、完整模型元数据及 Fast。Magpie 的上游订阅签名与客户端 provider 是两层，见 [CODEX_SUBSCRIPTION.md](CODEX_SUBSCRIPTION.md)。此前将本机官方登录列为模型/Fast 的前提，已在阶段 I 纠正。仅额外需要本机活动官方 provider/会话时考虑模式 R。官方 Codex CLI 0.159.2 已用无登录临时配置实际发出原模型 ID 和 priority 请求；真实 CPA、桌面及账号验收仍见 ACCEPTANCE.md。
 
+用户当前提供的版本为 **CPAMP 1.14.7 / CLIProxyAPI 内核 8.0.32**，已核对对应公开
+标签，见 CODEX_SUBSCRIPTION.md。面板不转发模型请求；8.0.32 内核有订阅 OAuth、
+完整 Codex 模型目录和 priority 处理，但部署的路由/参数覆盖仍待检查。Magpie 也没有
+模拟全部官方身份与路径；QCS 当前证明的是模型/Fast 请求能力，不能将无本机登录时
+与官方账号完全一致的体验标为完成。真实实例未连接，不读取或索取 OAuth 凭据。
+
 ## 2. 已完成的功能
 
 | 功能 | 入口 | 验证方式 |

@@ -67,11 +67,22 @@ qcs use codex cpa/gpt-5.5 --fast # 也可在客户端选 Fast；不传则保留�
   内置 OpenAI 认证、模型档位及 ChatGPT 请求压缩/HTTP 回退合同。
 - CPA 源码 `911f49cbd49f4fe2516979754a7488a3fd14fe64`：其 Codex Responses
   转换器将 `fast` 规范为 `priority`，保留 `priority`/`ultrafast`；其它值可能被移除。
+- 用户提供的实际版本为 CPAMP 1.14.7、内核 8.0.32。已通过远端标签确认：
+  `CLIProxyAPI v8.0.32` 正是上述 `911f49cb`；CPAMP 的 `v1.14.7` 为
+  `64ce94e6aa1af691555429a3211e67c59c0480ad`。CPAMP 是管理面板，模型请求由内核
+  处理；面板版本不固定内核版本。完整版本来源与接口表见 CODEX_SUBSCRIPTION.md。
 
 ## 仍需真实环境确认的边界
 
 - Fast 可选、请求带 `priority`，证明客户端能力和转发链路保留；实际档位、计费和速度
   取决于 CPA 版本、模型及它的上游账号，不能从本地测试保证实际加速。
+- 8.0.32 支持 `/v1/models?client_version=...` 完整 Codex 目录，不应称为只有裸 ID
+  列表；但混合/非 Codex 路由可能不声明 Fast，匹配的 payload override/filter 仍可
+  覆盖或删除 `service_tier`。真实部署未连接，不能从版本或本地假 SSE 推断最终上游档位。
+- Magpie 的官方前缀代理是选择性加工后转发真实官方，而非模拟全部官方服务；保留
+  官方账号体验仍依赖真实登录。Codex 的账号/额度使用独立 `chatgpt_base_url`，
+  只改 `openai_base_url` 也不会将这些请求全部转到 CPA。QCS 当前没有实现无本机
+  登录时与官方登录完全一致的账号体验；不能用 GPT 目录和 Fast 请求验证代替该要求。
 - CPA 直连的模型目录由 QCS 根据 CPA 列表和原生元数据生成，不依赖本机登录拉取官方目录。
   只有可选本地路由的“全走上游”仍将目录及其它官方后端路径留给官方。
   两者均不会自动把不支持的模型 ID 映射成目标模型。

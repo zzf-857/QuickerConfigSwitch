@@ -6,7 +6,7 @@
 
 已提交的阶段入口：A `96f94d4`，B `3865bec`，C `1ca7516`，D `f67c90c`。
 阶段 E 为 `6893f29`，F 为 `9a5a6ff`，G 为 `3d3c17b`，H 为 `e5f55eb`。
-阶段 I 随本记录提交，最终 SHA 用 `git log --oneline` 查看。
+阶段 I 为 `67bf339`，阶段 J 随本记录提交，最终 SHA 用 `git log --oneline` 查看。
 远端交接目标为 `origin/claude/exciting-galileo-cgd4uk`，
 提交与远端状态分别以 Git 历史、远端引用为准。
 
@@ -150,6 +150,21 @@
 - 新增 CODEX_SUBSCRIPTION.md，固定上游函数链接，更新 README、架构、四端说明、
   核心要求、交接与验收。OpenAI actor 工具能力作为独立待验项目，不宣称与 Fast 等同。
   本地假 SSE 不证明真实 CPA OAuth、订阅档位/提速或 Codex Desktop 完整体验。
+
+## 阶段 J：用户 CPAMP/内核版本与官方路径边界核验（已完成）
+
+- 用户提供 CPAMP 1.14.7 / 内核 8.0.32；只读远端标签核验确认 CPAMP
+  `v1.14.7=64ce94e6`、官方 CLIProxyAPI `v8.0.32=911f49cb`，后者正是之前的审计版本。
+  对照准确标签的面板 README、内核 API 路由、模型目录、OAuth executor 和 payload 规则。
+- CPAMP 管理/观察 CPA，不独立转发模型流量，面板 Plus 不代表另一套 Plus 内核。
+  8.0.32 有完整 Codex 目录、订阅 OAuth 与 priority 处理；并非只有模型 ID 列表。
+  非纯 Codex 路由可能清空目录档位，最终 payload 规则仍可覆盖/删除 priority。
+- 进一步明确 Magpie 不是模拟全部官方服务，而是官方前缀内选择性处理与真实认证转发；
+  Codex 的本机账号状态和独立 chatgpt_base_url 不由模型目录/openai_base_url 替代。
+  “模型/Fast 请求可用”不等于“无本机登录与官方账号完全一致”。
+- 仅更新来源、需求与交接文档，检查固定源码链接、标签和 `git diff --check`。
+  不改应用代码，不重复应用测试，不连接用户 CPA、不发真实模型请求或读取凭据。
+  真实部署路由、参数规则及最终档位仍按 ACCEPTANCE.md 验收。
 
 ## 后续验收与优化
 

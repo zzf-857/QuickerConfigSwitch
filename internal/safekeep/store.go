@@ -61,6 +61,9 @@ type written struct {
 	// one that no longer sets one takes it out.
 	Keys        []string `json:"keys,omitempty"`
 	RestoreKeys []string `json:"restore_keys,omitempty"`
+	// DeletedKeys are original headers removed by a historical whole-inline
+	// write and now managed individually after the user moved it to a table.
+	DeletedKeys []string `json:"deleted_keys,omitempty"`
 }
 
 type fileApplied struct {

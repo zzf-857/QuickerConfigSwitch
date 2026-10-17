@@ -9,10 +9,15 @@ import (
 	"testing"
 )
 
+// Marker lets readers of system locations and registries stay inside the
+// isolated test home too. Changing HOME alone cannot isolate those readers.
+const Marker = "QCS_TEST_SANDBOX"
+
 // Vars are the environment variables pointed into the temporary home.
 var Vars = []string{
 	"HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA",
 	"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME",
+	Marker,
 }
 
 // Cleared are variables that would point an agent or this tool elsewhere.
@@ -20,6 +25,7 @@ var Cleared = []string{"CODEX_HOME", "CLAUDE_CONFIG_DIR", "QCS_HOME"}
 
 // Setup points the home and config folders into dir.
 func Setup(dir string) {
+	os.Setenv(Marker, dir)
 	os.Setenv("HOME", dir)
 	os.Setenv("USERPROFILE", dir)
 	os.Setenv("APPDATA", filepath.Join(dir, "AppData", "Roaming"))

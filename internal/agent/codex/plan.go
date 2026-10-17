@@ -87,6 +87,9 @@ func (c *Codex) Plan(t agent.Target) (*plan.Plan, error) {
 			return nil, fmt.Errorf("codex: %s defines model_providers.%s in a form this tool doesn't edit; write it as a [model_providers.%s] table or remove it", path, table, table)
 		}
 	}
+	if err := checkDirectAuth(table, cfg.providers()[table], p); err != nil {
+		return nil, err
+	}
 
 	var top []plan.Op
 	set := func(k string, v any) { top = append(top, plan.Op{Kind: plan.SetTop, Key: k, Value: v}) }

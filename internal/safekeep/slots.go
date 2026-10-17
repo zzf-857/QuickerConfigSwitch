@@ -33,6 +33,9 @@ type Slot struct {
 	Kind  string `json:"kind"`
 	Table string `json:"table,omitempty"`
 	Key   string `json:"key,omitempty"`
+	// LiteralKeys distinguishes header names such as X.Trace from dotted
+	// TOML paths. On a table it applies to that table's owned keys.
+	LiteralKeys bool `json:"literal_keys,omitempty"`
 }
 
 // ID is the slot's name: toml-top:<key>, toml-key:<table>:<key>,
@@ -200,6 +203,9 @@ func putOriginal(path string, o *Original) error {
 		}
 		return dropCreated(path, o)
 	}
+	if err := ensurePrivateFile(path); err != nil {
+		return err
+	}
 	if o.Kind == WholeFile {
 		b, err := base64.StdEncoding.DecodeString(o.Raw)
 		if err != nil {
@@ -216,6 +222,9 @@ func putWritten(path string, wr *written) error {
 	if wr.Deleted {
 		return removeSlot(path, wr.Slot)
 	}
+	if err := ensurePrivateFile(path); err != nil {
+		return err
+	}
 	if wr.Kind == WholeFile {
 		return fmt.Errorf("%s: a whole file can't be written again from its hash", path)
 	}
@@ -227,6 +236,9 @@ func setRaw(path string, s Slot, raw string) error {
 	case TOMLTop:
 		return edit.SetTOMLTopPreserving(path, edit.KV{Path: s.Key, Value: edit.Raw(raw)})
 	case TOMLKey:
+		if s.LiteralKeys {
+			return edit.SetTOMLKeyQuoted(path, s.Table, s.Key, edit.Raw(raw))
+		}
 		return edit.SetTOMLKey(path, s.Table, s.Key, edit.Raw(raw))
 	case TOMLTable:
 		return edit.PutTOMLTableBlock(path, s.Table, raw)
@@ -284,7 +296,10 @@ func dropCreated(path string, o *Original) error {
 
 // apply carries out op on the file at path. prev are the keys an earlier
 // merging SetTable of the same table set.
-func apply(path string, op plan.Op, prev []string) error {
+func apply(path string, op plan.Op, prev []string, literalKeys bool) error {
+	if err := ensurePrivateFile(path); err != nil {
+		return err
+	}
 	switch op.Kind {
 	case plan.SetTop:
 		return edit.SetTOMLTopPreserving(path, edit.KV{Path: op.Key, Value: op.Value})
@@ -298,7 +313,11 @@ func apply(path string, op plan.Op, prev []string) error {
 		if _, ok := edit.GetTOMLTableBlock(path, op.Table); op.Whole || !ok {
 			lines := []string{"[" + op.Table + "]"}
 			for _, kv := range op.KVs {
-				lines = append(lines, kv.Path+" = "+edit.TOMLLiteral(kv.Value))
+				key := kv.Path
+				if literalKeys {
+					key = edit.TOMLLiteral(key)
+				}
+				lines = append(lines, key+" = "+edit.TOMLLiteral(kv.Value))
 			}
 			return edit.PutTOMLTableBlock(path, op.Table, strings.Join(lines, "\n"))
 		}
@@ -314,7 +333,11 @@ func apply(path string, op plan.Op, prev []string) error {
 			}
 		}
 		for _, kv := range op.KVs {
-			if err := edit.SetTOMLKey(path, op.Table, kv.Path, kv.Value); err != nil {
+			set := edit.SetTOMLKey
+			if literalKeys {
+				set = edit.SetTOMLKeyQuoted
+			}
+			if err := set(path, op.Table, kv.Path, kv.Value); err != nil {
 				return err
 			}
 		}
@@ -329,6 +352,20 @@ func apply(path string, op plan.Op, prev []string) error {
 		return edit.WriteAtomic(path, op.Data)
 	}
 	return fmt.Errorf("unknown op %q", op.Kind)
+}
+
+// Existing modes belong to the user. A new file may contain a provider key,
+// so make an empty private file before the editor writes any content. The
+// surrounding transaction removes this placeholder if a later edit fails.
+func ensurePrivateFile(path string) error {
+	_, exists, err := readFile(path)
+	if err != nil || exists {
+		return err
+	}
+	if err := edit.WriteAtomic(path, nil); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
 }
 
 // verify checks that the file at path still parses as its format.

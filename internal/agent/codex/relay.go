@@ -84,6 +84,7 @@ func (c *Codex) relayPlan(t agent.Target) (*plan.Plan, error) {
 		},
 		Notice: "保持此进程运行，并重启 Codex 桌面端及仍在运行的共享 app-server，再打开新 CLI 会话。" +
 			"在 Codex 模型选择器中选择 " + p.ID + "/" + t.Model + "；Fast 和推理强度仍由 Codex 控制。" +
-			"停止路由后自动还原地址，需再次重启 Codex。auth.json 没有被修改。",
+			"停止路由后自动还原地址，需再次重启 Codex。auth.json 没有被修改。" +
+			"使用代理时请让 127.0.0.1 直连：环境代理的 NO_PROXY 应包含 127.0.0.1，系统代理需设置本地地址绕过。qcs doctor 可检查当前进程的环境代理。",
 	}, nil
 }

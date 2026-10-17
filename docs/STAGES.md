@@ -5,8 +5,8 @@
 测试计数只描述对应阶段的检查，不当作后续阶段的固定基线。
 
 已提交的阶段入口：A `96f94d4`，B `3865bec`，C `1ca7516`，D `f67c90c`。
-阶段 E 随本记录提交，标题为 `fix: preserve Codex Fast and fail closed on config conflicts`；
-用 `git log --oneline` 查看最终 SHA。远端交接目标为 `origin/claude/exciting-galileo-cgd4uk`，
+阶段 E 为 `6893f29`。后续阶段的最终 SHA 用 `git log --oneline` 查看。
+远端交接目标为 `origin/claude/exciting-galileo-cgd4uk`，
 提交与远端状态分别以 Git 历史、远端引用为准。
 
 ## 阶段 A：安全还原与 CLI 路由（已完成）
@@ -79,6 +79,21 @@
   （无第二用户组、子进程文件锁 helper）；race/vet、18 项前端测试及模块校验通过。
   Linux GTK3 桌面构建、Windows amd64 GUI/macOS arm64 CLI 交叉编译通过。
   `scripts/check_codex_contract.py` 可用已安装的官方客户端重复目录合同检查。
+
+## 阶段 F：Codex 桌面识别、认证与请求头完整性（已完成）
+
+- 对照 Magpie 的显式请求头子表回归，修复已有 `http_headers` 子表无法切换的问题。
+  独立记录每个受管请求头，保留原注释、带点键和用户后续增加/修改的头。
+- 兼容仍有 ownership 的 inline→子表结构变更，不把 qcs 的旧密钥误记成原始值；
+  普通 inline `http_headers` 仍按整体键管理。
+- 阻止既有 qcs provider 的官方认证、env_key、认证命令或冲突动态头覆盖第三方认证；
+  保留无冲突的重试/跟踪等用户设置，报错不打印敏感值。
+- 复用 Magpie 的桌面身份检测，区分 Codex 版 `ChatGPT.app` 与独立聊天应用；
+  增加 Windows Store 主包识别及仅进程环境范围内的 loopback 代理诊断。
+- 新创建配置先设为 0600 再写密钥，含还原时重新创建保留表的路径；原文件权限不变。
+- 验证：Codex/desktopapp/edit/safekeep/e2e race、相关 vet 通过；覆盖子表还原/漂移/
+  旧记录迁移、点号键、写密钥前权限、失败占位文件清理。Windows 检测测试交叉编译通过。
+- 边界：代理诊断不读取桌面登录 shell 或平台系统代理；实际应用/Store 和代理仍待真机验收。
 
 ## 后续验收与优化
 

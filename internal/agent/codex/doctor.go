@@ -33,6 +33,9 @@ func (c *Codex) Doctor() []agent.Problem {
 		add("warn", "%s is not valid TOML (%v); Codex can't load it and this tool won't edit it", path, cfg.err)
 		return out
 	}
+	if problem := loopbackProxyProblem(cfg); problem != nil {
+		out = append(out, *problem)
+	}
 	provs := cfg.providers()
 	if mp, _ := cfg.str("model_provider"); mp != "" && !builtin[mp] {
 		if _, ok := provs[mp]; !ok {

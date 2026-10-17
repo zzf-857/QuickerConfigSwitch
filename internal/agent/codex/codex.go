@@ -46,6 +46,7 @@ import (
 
 	"github.com/zzf-857/quickerconfigswitch/internal/agent"
 	"github.com/zzf-857/quickerconfigswitch/internal/appdir"
+	"github.com/zzf-857/quickerconfigswitch/internal/desktopapp"
 	"github.com/zzf-857/quickerconfigswitch/internal/edit"
 	"github.com/zzf-857/quickerconfigswitch/internal/safekeep"
 )
@@ -109,6 +110,8 @@ func (c *Codex) Detect() agent.Detection {
 		d.Installed = true
 	} else if _, err := exec.LookPath("codex"); err == nil {
 		d.Installed = true
+	} else if desktopInstalled(ID) {
+		d.Installed = true
 	}
 	if cats, _ := filepath.Glob(CatalogPath("*")); len(cats) > 0 {
 		sort.Strings(cats)
@@ -117,6 +120,8 @@ func (c *Codex) Detect() agent.Detection {
 	d.SignedIn, d.SignIn = signIn()
 	return d
 }
+
+var desktopInstalled = desktopapp.Installed
 
 // signIn says what auth.json holds, by shape only. With
 // cli_auth_credentials_store = "keyring" Codex keeps the sign-in in the

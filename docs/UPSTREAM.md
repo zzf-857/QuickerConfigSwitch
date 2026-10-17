@@ -20,6 +20,9 @@
 | `internal/autostart`（阶段 C） | `internal/autostart` 的 self/XDG/LaunchAgent/Run/StartupApproved | 直接裁剪平台实现，替换产品名及 `gui --hidden` 参数；增加显式 GUI 能力与已有记录保护 |
 | `internal/cli/autostart.go`（阶段 C） | `internal/cli/autostart_cli.go` | 沿用显式启停后查询系统真实记录的流程，适配本项目输出与错误码 |
 | `internal/relay/models.go`、命名空间检查（阶段 D） | `internal/gateway/codex_backend.go` 的 `codexModelsWait`、`codexModels`、`codexBackend`；`internal/codexcat/codexcat.go` 的 `CacheEntries` | 精简提取三秒预算、目录缓存回退与未知前缀拒绝，保留原始 JSON、只读/有界缓存、401/403 和会话权限边界 |
+| `internal/desktopapp`、Codex Detect（阶段 F） | `internal/agent/desktopapp.go`、`desktopapp_windows.go` 与身份测试 | 只提取 Codex bundle/Store 身份及有限安装目录；测试隔离真实应用目录和注册表 |
+| `internal/agent/codex/proxy.go`（阶段 F） | `internal/agent/codex_proxy.go`、`codex_proxy_test.go` | 复制 reqwest 环境变量/NO_PROXY 匹配及回归；不引入 login shell、系统代理或修改代理配置 |
+| 显式请求头子表支持（阶段 F） | `internal/agent/codex_headers_table_test.go`、`internal/edit/toml.go` 的 Inline→子表合并 | safekeep 拆分子表所有权、迁移旧 inline 记录；新增小型 quoted-key 编辑入口复用原语；新文件 0600 在调用层处理 |
 
 Magpie 的配置适配器与网关不是直接整包复制的目标：它们还包含账户、路由组、
 后台守护进程和自动重启等本项目暂不需要的功能。只提取当前配置切换所需部分。

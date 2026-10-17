@@ -5,7 +5,7 @@
 
 ## 1. 一句话现状
 
-CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、GUI/Web 和托盘生命周期管理**，并复用了 Magpie 的可选登录自启、目录回退与命名空间检查。阶段 A–D 已提交，阶段 E 完成核心需求审查和修复，具体记录见 [STAGES.md](STAGES.md)，复用映射见 [UPSTREAM.md](UPSTREAM.md)。保留活动官方登录且所有模型请求走 CPA，应使用「本地路由 + 全走上游」。官方 Codex CLI 0.159.2 已用隔离配置验证目录及 Fast 档位；真实用户桌面、账号与 CPA 的最终验收仍未完成，不能以本地测试替代。
+CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、GUI/Web 和托盘生命周期管理**，并复用了 Magpie 的可选登录自启、目录回退与命名空间检查。阶段 A–F 已完成并经测试，具体记录见 [STAGES.md](STAGES.md)，复用映射见 [UPSTREAM.md](UPSTREAM.md)。保留活动官方登录且所有模型请求走 CPA，应使用「本地路由 + 全走上游」。官方 Codex CLI 0.159.2 已用隔离配置验证目录及 Fast 档位；真实用户桌面、账号与 CPA 的最终验收仍未完成，不能以本地测试替代。
 
 ## 2. 已完成的功能
 
@@ -93,9 +93,10 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - **适配器永远不写文件**，只返回 `plan.Plan`；写入、备份、还原全部由 `safekeep` 负责。
 - `safekeep.Apply` 的语义是"本次计划是该 Agent 的**全部**期望状态"：上次写过、这次没写的键会还原。
 - `plan.Op.Keep`：还原时保留（Codex 的 `[model_providers.qcs-*]` 表，旧会话重新打开要用）。
-- `plan.Op.RestoreKeys`：Keep 表中仍须撤销的键，当前用于 `experimental_bearer_token` 与 `http_headers`；按键记录原值与最后写入值，用户改过的值不动。旧状态迁移逐项处理仍有明确写入记录的 qcs 表，包括早期只撤销 token 的记录。`http_headers` 作为整体键管理，用户改动后会保留并报告，不猜测删除子项。
+- `plan.Op.RestoreKeys`：Keep 表中仍须撤销的键，当前用于 `experimental_bearer_token` 与 `http_headers`；按键记录原值与最后写入值，用户改过的值不动。旧状态迁移逐项处理仍有明确写入记录的 qcs 表，包括早期只撤销 token 的记录。inline `http_headers` 按整体键管理；显式子表按受管请求头分别管理，保留用户新增/改动并报告。`Slot.LiteralKeys` 支持带点号的真实请求头，不当成嵌套路径。
 - `safekeep.RestoreIfState`：锁内校验会话标记后还原；路由退出不能撤销另一个进程后来的切换。Apply/Restore 在配置文件和状态记录任一写入失败时一起回滚。
 - `safekeep.lockAll`：获取不到跨进程锁时必须返回错误；不能忽略 Magpie 通用锁原语的 held=false。直连旧版活动 profile 若覆盖计划则拒绝；现代独立 `--profile` 配置层需由客户端启动方式确认。
+- 新配置在写入密钥前设为 0600，已有配置权限保留；含还原时重建保留 provider 表的路径。Codex 直连拒绝已有 qcs provider 的冲突认证，不静默删用户键；桌面检测按应用身份区分 Codex 与同名 ChatGPT 聊天端。loopback 代理诊断仅覆盖当前进程环境。
 - 模型列表为空时用已有 `provider.DefaultFast` 补齐临时模型能力，显式 Fast=false 仍保留。直连若已有自定义目录则改指向 provider 目录，不编辑原文件；后续切换可能继续使用生成目录，直到还原时恢复原指向。
 - GUI/Web 的 `core.RelayController` 由宿主进程创建并负责 Close；Handler 不隐式创建生命周期。Wails `OnShutdown` 必须同步清理，单用 defer 在部分平台无效。路由预览返回一次性 ID，确认只用该 ID；关闭/超时不能保留进程锁。
 - 数据目录：`appdir.Dir()`（可用 `QCS_HOME` 覆盖）下的 `providers.json`、`profiles.json`、`state/stash.json`、`state/applied.json`、`backups/`、`codex/catalog-*.json`。

@@ -57,7 +57,7 @@ func seedRestoreKeys(fs *fileStash, fa *fileApplied) error {
 			if !slices.Contains(wr.Keys, key) || table.Restore[key] != nil {
 				continue
 			}
-			o := &Original{Slot: Slot{Kind: TOMLKey, Table: wr.Table, Key: key}}
+			o := &Original{Slot: Slot{Kind: TOMLKey, Table: wr.Table, Key: key, LiteralKeys: wr.LiteralKeys}}
 			if table.Existed {
 				var err error
 				o.Raw, o.Existed, err = edit.TOMLKeyRaw(table.Raw, wr.Table, key)
@@ -79,7 +79,7 @@ func captureRestoreKeys(path string, op plan.Op, table *Original) {
 		if table.Restore[key] != nil {
 			continue
 		}
-		o := capture(path, Slot{Kind: TOMLKey, Table: op.Table, Key: key})
+		o := capture(path, Slot{Kind: TOMLKey, Table: op.Table, Key: key, LiteralKeys: table.LiteralKeys})
 		o.Created = "" // the table must survive even when this was its only key
 		if table.Restore == nil {
 			table.Restore = map[string]*Original{}
@@ -94,13 +94,14 @@ func keptKeyRestores(path string, fs *fileStash, wr *written, keys []string, res
 		if !slices.Contains(wr.Keys, key) {
 			continue
 		}
-		sl := Slot{Kind: TOMLKey, Table: wr.Table, Key: key}
+		sl := Slot{Kind: TOMLKey, Table: wr.Table, Key: key, LiteralKeys: wr.LiteralKeys}
 		var o *Original
 		if fs != nil && fs.Slots[wr.ID()] != nil {
 			o = fs.Slots[wr.ID()].Restore[key]
 		}
 		raw, ok, err := edit.TOMLKeyRaw(wr.Raw, wr.Table, key)
-		if err != nil || !ok || o == nil || !unchanged(path, &written{Slot: sl, Raw: raw}) {
+		deleted := slices.Contains(wr.DeletedKeys, key)
+		if err != nil || !ok && !deleted || o == nil || !unchanged(path, &written{Slot: sl, Raw: raw, Deleted: deleted}) {
 			res.Left = append(res.Left, sl.ID())
 			continue
 		}
@@ -113,6 +114,7 @@ func retireRestoreKeys(fs *fileStash, wr *written, keys []string) {
 	for _, key := range keys {
 		wr.Keys = slices.DeleteFunc(wr.Keys, func(k string) bool { return k == key })
 		wr.RestoreKeys = slices.DeleteFunc(wr.RestoreKeys, func(k string) bool { return k == key })
+		wr.DeletedKeys = slices.DeleteFunc(wr.DeletedKeys, func(k string) bool { return k == key })
 		if fs != nil && fs.Slots[wr.ID()] != nil {
 			delete(fs.Slots[wr.ID()].Restore, key)
 		}

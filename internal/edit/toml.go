@@ -189,6 +189,21 @@ func SetTOMLKey(path, name, key string, value any) error {
 	return writeTOML(path, out)
 }
 
+// SetTOMLKeyQuoted is SetTOMLKey with a new key written as a quoted string,
+// so dots and other punctuation remain part of the key rather than a key path.
+// An existing key keeps its spelling, whitespace and trailing comment.
+func SetTOMLKeyQuoted(path, name, key string, value any) error {
+	raw, err := Read(path)
+	if err != nil {
+		return err
+	}
+	out, err := setTOMLKeyLines(splitLines(string(raw)), name, key, tomlString(key), value)
+	if err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	return writeTOML(path, out)
+}
+
 // setTOMLKeyLines is SetTOMLKey on lines: the key named `key` (as the parser
 // names it, quotes taken off) is set, and a new one is written as `spelled`.
 func setTOMLKeyLines(lines []string, name, key, spelled string, value any) ([]string, error) {

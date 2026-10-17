@@ -460,12 +460,15 @@ func (e *engine) jobs(p *plan.Plan) ([]*job, error) {
 			if len(op.RestoreKeys) > 0 && (op.Kind != plan.SetTable || !op.Keep || op.Whole) {
 				return nil, fmt.Errorf("%s: RestoreKeys needs a kept merging SetTable", path)
 			}
-			sl, err := slotOf(fe.Format, op)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", path, err)
+			for _, part := range tableOperations(path, op) {
+				sl, err := slotOf(fe.Format, part.op)
+				if err != nil {
+					return nil, fmt.Errorf("%s: %w", path, err)
+				}
+				sl.LiteralKeys = part.literalKeys
+				j.ops = append(j.ops, part.op)
+				j.slots = append(j.slots, sl)
 			}
-			j.ops = append(j.ops, op)
-			j.slots = append(j.slots, sl)
 		}
 	}
 	a := e.s.applied.Agents[e.agent]
@@ -535,6 +538,9 @@ func (e *engine) sync(jobs []*job, restore bool) (*Report, error) {
 		}
 		if err := seedRestoreKeys(fs, a.Files[j.real]); err != nil {
 			return nil, fmt.Errorf("%s: recorded table: %w", j.real, err)
+		}
+		if err := migrateHeaderTables(w, fs, a.Files[j.real]); err != nil {
+			return nil, fmt.Errorf("%s: recorded headers: %w", j.real, err)
 		}
 		for _, sl := range j.slots {
 			if fs.Slots[sl.ID()] == nil {
@@ -690,7 +696,7 @@ func (e *engine) syncFile(j *job, restore bool) (*FileResult, error) {
 				prev = wr.Keys
 			}
 		}
-		if err := apply(w, op, prev); err != nil {
+		if err := apply(w, op, prev, j.slots[i].LiteralKeys); err != nil {
 			return nil, err
 		}
 	}

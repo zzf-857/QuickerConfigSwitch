@@ -5,9 +5,10 @@
 - 给 Codex CLI/桌面端、Claude Code CLI、Claude Desktop 切换自定义 provider / 模型
 - 只改必要的键，注释与格式原样保留；随时还原原配置
 - 不碰官方登录文件（Codex 的 `auth.json`、Claude Code 的凭据）：切回即恢复官方订阅
-- Codex 切到第三方（如 CPA）后仍保留 Fast 模式
+- CPA 可统一管理官方订阅账号；Codex 直连 CPA，无需本机官方登录也保留 GPT 原名和 Fast 能力
 
 各客户端配置、登录边界与 Magpie 复盘见 [docs/CLIENTS.md](docs/CLIENTS.md)。
+Magpie 官方订阅链路及 CPA 使用方式见 [docs/CODEX_SUBSCRIPTION.md](docs/CODEX_SUBSCRIPTION.md)。
 核心要求、证据和验收边界见 [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)，
 架构设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
@@ -47,14 +48,22 @@ qcs use codex official                     # 切回官方（= qcs restore codex�
 qcs doctor                                 # 检查冲突与漂移
 ```
 
+如果官方订阅的登录、刷新和账号选择都在 CPA 中管理，以上**直连**就是推荐方式。
+客户端使用 CPA key，CPA 再用它持有的官方订阅请求 GPT；本机不需要 `auth.json`，
+也不需要运行 QCS 本地路由。`cpa/` 是 QCS 选择引用，实际发给 CPA 的模型仍为 `gpt-5.5`。
+拉取后的模型列表决定选择器内容，标准 GPT 条目保留官方显示名、指令、推理档位和 Fast；
+`--fast` 可以显式开启，省略时保留原选择。实际优先级由 CPA 与它的账号决定。
+
 切到 Codex 直连模式后：
 
 - 重启 Codex 桌面端及仍在运行的共享 app-server，再打开新 CLI 会话；共享进程可能缓存旧地址和模型目录，仅新开终端不一定生效；
-- 桌面端只显示在这个 provider 上开的会话，ChatGPT 登录态功能暂不可用；切回官方即恢复；
+- 桌面会话按 provider 区分；远程控制、云任务等本机 ChatGPT 账号功能仍由客户端决定，不是模型目录或 Fast 的前提；
 - `[model_providers.qcs-<id>]` 表在切回官方后会保留，以便加载旧会话；qcs 写入的密钥会撤销，原来已有的密钥还原，被用户另行修改的值保留。再次使用该 provider 时重新切换即可写入当前密钥。
-- 原有自定义模型目录文件保持不动，必要时临时改用 provider 目录并在还原时恢复原指向。旧版活动 profile 覆盖切换键时会提示冲突；独立 `--profile` 配置层应在客户端启动时确认。
+- 原有自定义模型目录文件保持不动；已有 provider 模型列表时始终绑定完整的 provider 目录，还原时恢复原指向。旧版活动 profile 覆盖切换键时会提示冲突；独立 `--profile` 配置层应在客户端启动时确认。
 
 ## 保留官方登录的本地路由
+
+这是额外需要保留本机活动官方 provider/账号与原有会话时的可选方式；CPA 代管订阅无需此路由。
 
 先配置一个支持 Responses 的 provider，然后在终端运行：
 
@@ -79,7 +88,7 @@ Ctrl+C 或 SIGTERM 会停止路由并还原原来的地址。异常退出后，�
 
 `qcs web` 由服务进程持有路由，关闭浏览器标签不停止已启动的路由；停止服务会还原。另一个 CLI/桌面进程持有的路由会显示为外部进程，本窗口不能代替它停止。运行中的路由不能保存为方案；先停止路由再进行 Codex 直连切换或应用包含 Codex 的方案。路由使用启动时的 provider 配置，编辑 provider 后需停止并重启才生效。
 
-官方 Codex CLI 0.159.2 已在隔离配置下验证模型目录加载及 Fast 档位；真实订阅登录、CPA Fast、原生托盘和完整桌面交互仍需要用户机器验收。自动测试使用本地假后端，不需要真实密钥。官方认证失效或桌面端因订阅额度耗尽阻止发起请求时，本工具不承诺绕过客户端限制。
+官方 Codex CLI 0.159.2 已验证无本机登录的模型目录、原生推理档位和实际 Fast 请求：本地假 CPA 收到原模型 ID、CPA key 及 `service_tier: priority`。真实订阅、CPA 的实际提速、原生托盘和完整桌面交互仍需要用户机器验收。可选路由中的本机官方认证失效或客户端额度限制仍由官方处理。
 
 ## Claude CLI / Desktop
 

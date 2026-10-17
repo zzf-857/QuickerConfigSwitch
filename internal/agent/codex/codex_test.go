@@ -125,9 +125,9 @@ func TestRegistered(t *testing.T) {
 	}
 }
 
-// (a) a model of Codex's bundled catalog, which offers Fast there: no catalog.
+// Without a provider list, a bundled model can use Codex's own catalog.
 func TestPlanBundledModelNoCatalog(t *testing.T) {
-	setup(t, fixture, provider.Model{ID: "gpt-5.5", Fast: true})
+	setup(t, fixture)
 	p := mustPlan(t, agent.Target{Mode: agent.Direct, Provider: "cpa", Model: "gpt-5.5", Fast: ptr(true)})
 	if len(p.Edits) != 1 {
 		t.Fatalf("edits: %+v", p.Edits)
@@ -236,14 +236,53 @@ func TestPlanFastTriState(t *testing.T) {
 		t.Fatalf("nil touched service_tier: %+v", got)
 	}
 	// Fast=false on a bundled GPT model that offers Fast needs a catalog
-	// without it; nil keeps the model's own Fast (bundled, no catalog)
+	// without it; nil keeps Fast in the provider's explicit catalog.
 	off := mustPlan(t, agent.Target{Mode: agent.Direct, Provider: "cpa", Model: "gpt-5.5", Fast: ptr(false)})
 	cat, ok := catalogEdit(off)
 	if !ok || !strings.Contains(string(cat.Ops[0].Data), `"service_tiers": []`) || strings.Contains(string(cat.Ops[0].Data), `"id": "priority"`) {
 		t.Fatalf("Fast=false catalog: %v", ok)
 	}
-	if _, ok := catalogEdit(mustPlan(t, agent.Target{Mode: agent.Direct, Provider: "cpa", Model: "gpt-5.5"})); ok {
-		t.Fatal("nil Fast on bundled Fast model wrote a catalog")
+	if cat, ok := catalogEdit(mustPlan(t, agent.Target{Mode: agent.Direct, Provider: "cpa", Model: "gpt-5.5"})); !ok || !strings.Contains(string(cat.Ops[0].Data), `"id": "priority"`) {
+		t.Fatal("nil Fast lost the native Fast capability")
+	}
+}
+
+func TestPlanListedNativeModelsUseProviderCatalog(t *testing.T) {
+	setup(t, fixture,
+		provider.Model{ID: "gpt-5.5", Name: "gpt-5.5", Fast: true},
+		provider.Model{ID: "gpt-6-sol", Name: "gpt-6-sol", Fast: true})
+	p := mustPlan(t, agent.Target{Mode: agent.Direct, Provider: "cpa", Model: "gpt-5.5"})
+	cat, ok := catalogEdit(p)
+	if !ok {
+		t.Fatal("explicit CPA model list fell back to all bundled models")
+	}
+	var catalog struct {
+		Models []struct {
+			Slug         string `json:"slug"`
+			Name         string `json:"display_name"`
+			Context      int    `json:"context_window"`
+			Instructions string `json:"base_instructions"`
+			Messages     struct {
+				Instructions string `json:"instructions_template"`
+			} `json:"model_messages"`
+			Tiers []struct {
+				ID string `json:"id"`
+			} `json:"service_tiers"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(cat.Ops[0].Data, &catalog); err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.Models) != 2 || catalog.Models[0].Slug != "gpt-5.5" || catalog.Models[0].Name != "GPT-5.5" ||
+		catalog.Models[1].Slug != "gpt-6-sol" || catalog.Models[0].Context == 0 ||
+		(catalog.Models[0].Instructions == "" && catalog.Models[0].Messages.Instructions == "") ||
+		len(catalog.Models[0].Tiers) == 0 || catalog.Models[0].Tiers[0].ID != "priority" {
+		t.Fatalf("native model metadata or CPA membership lost: %+v", catalog)
+	}
+	for _, op := range configEdit(t, p).Ops {
+		if op.Key == "service_tier" || op.Table == "features" {
+			t.Fatal("catalog binding changed the user's Fast selection")
+		}
 	}
 }
 

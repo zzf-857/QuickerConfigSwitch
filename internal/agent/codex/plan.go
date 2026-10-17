@@ -102,7 +102,10 @@ func (c *Codex) Plan(t agent.Target) (*plan.Plan, error) {
 	// to our provider catalog instead of silently keeping incompatible model
 	// capabilities; safekeep restores the original pointer, never that file.
 	existingCatalog, _ := cfg.str("model_catalog_json")
-	if codexcat.NeedsCatalog(models) || existingCatalog != "" {
+	// A provider's explicit list is authoritative even when every ID is a
+	// bundled GPT. Otherwise Codex shows its entire built-in list, including
+	// models this CPA does not serve. Keep the full native entries in our list.
+	if len(p.Models) > 0 || codexcat.NeedsCatalog(models) || existingCatalog != "" {
 		cp := CatalogPath(p.ID)
 		next, err := codexcat.Catalog(models, appdir.CodexHome())
 		if err != nil {
@@ -257,7 +260,8 @@ func catalogModels(p provider.Provider, chosen string, fast *bool) []codexcat.Mo
 }
 
 func notice() string {
-	return "重启 Codex 桌面端及仍在运行的共享 app-server，再打开新的 Codex CLI 会话。" +
-		"直连模式下，Codex 桌面端只列出在这个 provider 上开的会话，且暂时没有 ChatGPT 登录态功能（远程控制、云任务等）；" +
-		"切回官方即恢复。auth.json 没有被修改。"
+	return "直连使用 provider 的认证；CPA 可在上游使用官方订阅，本机无需 ChatGPT 登录即可使用模型目录和 Fast。" +
+		"重启 Codex 桌面端及仍在运行的共享 app-server，再打开新的 Codex CLI 会话。" +
+		"桌面会话按 provider 区分，远程控制、云任务等本机 ChatGPT 登录功能另受客户端限制。" +
+		"auth.json 没有被修改；切回官方恢复原配置。"
 }

@@ -55,6 +55,20 @@ func TestCopiedOwnEntry(t *testing.T) {
 	}
 }
 
+func TestNativeDisplayNameAfterProviderFetch(t *testing.T) {
+	home := testenv.Home(t)
+	for _, tc := range []struct{ name, want string }{
+		{"", "GPT-5.5"},
+		{"gpt-5.5", "GPT-5.5"},
+		{"My CPA GPT", "My CPA GPT"},
+	} {
+		e := render(t, []Model{{Slug: "gpt-5.5", Name: tc.name, Fast: true}}, home)[0]
+		if e["display_name"] != tc.want || !reflect.DeepEqual(tiersOf(e), []string{"priority"}) {
+			t.Fatalf("fetched native model name=%q display=%v tiers=%v", tc.name, e["display_name"], tiersOf(e))
+		}
+	}
+}
+
 // requiredInfo mirrors the fields Codex's ModelInfo has no serde default for.
 type requiredInfo struct {
 	Slug        *string           `json:"slug"`

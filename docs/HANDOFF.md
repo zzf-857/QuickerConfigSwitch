@@ -5,7 +5,7 @@
 
 ## 1. 一句话现状
 
-CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、GUI/Web 和托盘生命周期管理**，并复用了 Magpie 的可选登录自启、目录回退与命名空间检查。Claude Desktop 已有独立的 3p 适配和界面入口，具体四端支持与登录边界见 CLIENTS.md。阶段 A–H 已完成并经测试，具体记录见 [STAGES.md](STAGES.md)，复用映射见 [UPSTREAM.md](UPSTREAM.md)。保留活动官方登录且所有模型请求走 CPA，应使用「本地路由 + 全走上游」。官方 Codex CLI 0.159.2 已用隔离配置验证目录及 Fast 档位；真实用户桌面、账号与 CPA 的最终验收仍未完成，不能以本地测试替代。
+CLI 核心、图形界面、方案和导入已完成；Claude Desktop 有独立 3p 入口，模式 R 有 CLI、GUI/Web、托盘生命周期管理和可选登录自启。用户主场景是 **CPA 统一管理官方订阅，QCS 配置 Codex 直连**：无需本机 ChatGPT 登录或额外 QCS 路由，保留 GPT 原名、完整模型元数据及 Fast。Magpie 的上游订阅签名与客户端 provider 是两层，见 [CODEX_SUBSCRIPTION.md](CODEX_SUBSCRIPTION.md)。此前将本机官方登录列为模型/Fast 的前提，已在阶段 I 纠正。仅额外需要本机活动官方 provider/会话时考虑模式 R。官方 Codex CLI 0.159.2 已用无登录临时配置实际发出原模型 ID 和 priority 请求；真实 CPA、桌面及账号验收仍见 ACCEPTANCE.md。
 
 ## 2. 已完成的功能
 
@@ -14,6 +14,7 @@ CLI 核心、图形界面、方案和导入已完成；模式 R 支持 **CLI、G
 | 自定义 provider 增删改、拉取 `/v1/models`、每个模型的 Fast 开关 | `qcs provider …`、界面 Providers 页 | 单元测试 + httptest |
 | Codex 直连第三方（模式 D），保留 `auth.json`、用户的 `service_tier`/Fast、`[features]`、CC Switch 表 | `qcs use codex cpa/<model>`、界面 Agents 页 | 单元 + 端到端 + 手工冒烟 |
 | 为 Codex 生成带 Fast 档位的模型目录（`model_catalog_json`）；保留/还原原自定义目录指向 | 自动 | 单元 + 端到端 + 官方 CLI 隔离加载 |
+| CPA 直连无需本机官方登录；明确列表只展示 CPA 模型并保留 GPT 原名及原生能力 | `qcs provider models cpa --fetch` 后直连 | 官方 CLI 无 `auth.json`，实际本地假 SSE 请求及还原 |
 | Claude Code 直连第三方（写 `settings.json` 的 `env`），保留 JSONC 注释、原认证/模型/effort 上限 | `qcs use claude …` | 单元 + 端到端 + 官方 CLI 本地 SSE |
 | Claude Desktop 独立 3p 配置，保留原数据与登录，MSIX 两套路径 | `qcs use claude-desktop …`、独立界面卡片 | 临时配置/路径/回滚/权限 race + API/浏览器流程；原生应用待验收 |
 | 切回官方：文件没被别人改过时逐字节还原，否则只撤销 qcs 写的键 | `qcs use <agent> official` / `qcs restore` | 单元 + 端到端 |
@@ -67,6 +68,7 @@ make cli
 - 阶段 F：Codex 认证覆盖与静态/动态旧认证头冲突保护、显式请求头子表还原/漂移及旧记录迁移；桌面身份识别、loopback 代理诊断和新文件私有创建。原有缺省权限不被更改。
 - 阶段 G：Claude CLI 补齐云/子代理/后台模型/元数据、精确 ID、自定义请求头和显式 effort/上限；拒绝空认证导致官方 OAuth 传到第三方的路径。官方 CLI 2.1.302 六项临时本地请求检查通过。
 - 阶段 H：独立 Claude Desktop 3p 适配、Magpie 多平台/MSIX 路径、服务端兼容模型筛选和界面卡片完成；真实后端 Chromium 取消/确认/还原及权限流程通过。最终 GTK3/`nogui` 各 20 个测试包、368 个顶层测试通过、2 个条件跳过，19 项前端测试通过；两种 vet、依赖校验与三平台构建通过。两个官方 CLI 合同脚本在最终构建重跑通过。
+- 阶段 I：CPA 代管订阅的直连作为主场景，不要求本机登录；修复纯原生模型列表多列内置模型和 fetch 占位名覆盖官方名称。官方 Codex 无登录实际模型/Fast/priority 请求与还原合同加入永久脚本，五例全通过。GTK3/`nogui` 各 20 包、370 个顶层测试通过、2 个条件跳过；两种 race/vet、19 项前端测试、模块校验和三平台构建通过。真实后端 Chromium 验证直连说明/路由切换及 Desktop 往返。源码链路及真机边界见 CODEX_SUBSCRIPTION.md。
 
 ## 4. 代码地图
 
@@ -106,14 +108,14 @@ internal/e2e            端到端测试（官方 → CPA → 官方）
 - 新配置在写入密钥前设为 0600，已有配置权限保留；含还原时重建保留 provider 表的路径。Codex 直连拒绝已有 qcs provider 的冲突认证，不静默删用户键；桌面检测按应用身份区分 Codex 与同名 ChatGPT 聊天端。loopback 代理诊断仅覆盖当前进程环境。
 - `written.DeletedKeys` 只记录已明确拥有的键级删除，用于旧 inline→请求头子表迁移时恢复原先被覆盖删除的头；不能把缺失的任意键猜成 qcs 删除。Windows 的新文件权限依赖用户目录继承的 ACL，Unix 的 0600 检查不代替 Windows ACL 验收。
 - `AgentView.ModelRefs`：nil 表示无额外模型限制，空数组表示没有可用模型；Desktop 的可配置模型由适配器 SupportsModel 统一筛选，前端不重复维护正则规则。Desktop 不接受界面/CLI 的 Fast 或 effort 覆盖，登录状态不读取并显示未知。
-- 模型列表为空时用已有 `provider.DefaultFast` 补齐临时模型能力，显式 Fast=false 仍保留。直连若已有自定义目录则改指向 provider 目录，不编辑原文件；后续切换可能继续使用生成目录，直到还原时恢复原指向。
+- 模型列表为空时用已有 `provider.DefaultFast` 补齐临时模型能力，显式 Fast=false 仍保留。有明确列表时总绑定 provider 目录，避免 Codex 内置列表多列 CPA 不支持的模型；`Name == ID` 为拉取占位名，保留原生 GPT 显示名。已有自定义目录只改指向，不编辑原文件；还原恢复原指向。
 - GUI/Web 的 `core.RelayController` 由宿主进程创建并负责 Close；Handler 不隐式创建生命周期。Wails `OnShutdown` 必须同步清理，单用 defer 在部分平台无效。路由预览返回一次性 ID，确认只用该 ID；关闭/超时不能保留进程锁。
 - 数据目录：`appdir.Dir()`（可用 `QCS_HOME` 覆盖）下的 `providers.json`、`profiles.json`、`state/stash.json`、`state/applied.json`、`backups/`、`codex/catalog-*.json`。
 
 ## 5. 已知问题与待办（按优先级）
 
 **需要尽快做**
-1. **在真实机器上验收**：macOS / Windows / Linux 各装一次，用真实 Codex 桌面端 + CPA 走一遍「切换 → /fast 可用 → 切回」。已用官方 CLI 0.159.2 实际加载隔离配置及模型列表，尚未使用真实订阅、桌面端或远端 CPA。
+1. **在真实机器上验收**：优先验收 CPA 持有订阅、本机无登录的 Codex Desktop「直连 → 模型原名/推理档位/Fast → 实际响应 → 还原」。官方 CLI 已验证配置、目录和实际本地 priority 请求；真实 CPA、订阅及桌面 UI 尚未验证。可选本机官方登录路由单独验收，不作为前者前提。
 2. **旧版本已还原且丢失管理记录的残留 key**：新的撤销逻辑和旧状态迁移已经实现，但不能仅凭 `qcs-*` 表名前缀删除无记录的值。若要提供彻底清理，需另做可预览、用户明确选择的流程。provider 数据和历史备份仍按原设计保存；本次修复不是整盘密钥擦除。
 3. **托盘相关行为未实测**：点击切换面板、失焦隐藏、二次启动唤起主窗口、macOS 无 Dock 图标。Xvfb 里没有托盘宿主，只验证了主窗口能显示。
 

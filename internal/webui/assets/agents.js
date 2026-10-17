@@ -277,6 +277,7 @@ function agentCard(app, a) {
       h('div', { class: 'badges' }, signInBadge(a))),
     currentLine(a),
     codex ? h('small', { class: 'muted' }, t('codexClientsHint')) : null,
+    codex && !routing ? h('div', { class: 'notice notice-info' }, t('codexDirectHint')) : null,
     a.id === 'claude-desktop' ? h('div', { class: 'notice notice-info' }, t('claudeDesktopHint')) : null,
     a.detail ? h('div', { class: 'detail muted' }, a.detail) : null,
     a.error ? h('div', { class: 'notice notice-error' }, a.error) : null,

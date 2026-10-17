@@ -17,6 +17,7 @@
 | `internal/filememo`、`internal/steady`、`internal/filelock` | 同名包 | 保留原有文件/进程同步实现，替换模块导入 |
 | `internal/safekeep` | 上述编辑与还原原语 | 适配 plan/stash/applied 快照及会话条件还原；调用方获取不到进程锁时停止，不改变上游 filelock 的通用语义 |
 | `internal/codexcat` | `internal/codexcat` | 保留模型条目/Fast 逻辑，适配本项目 provider 类型 |
+| Codex 官方订阅模型目录复盘 | `internal/provider/codex_models.go` 的 `CodexCatalog`/`CodexTiers`、`internal/codexcat/codexcat.go` 的 `Entries`、`internal/agent/codex.go` 的双路径配置 | 沿用完整原生条目与 Fast 规则；直连使用精确上游 ID，显式模型列表始终生成目录；名称等于 ID 时保留官方显示名；账户与 OAuth 由 CPA 管理 |
 | `internal/autostart`（阶段 C） | `internal/autostart` 的 self/XDG/LaunchAgent/Run/StartupApproved | 直接裁剪平台实现，替换产品名及 `gui --hidden` 参数；增加显式 GUI 能力与已有记录保护 |
 | `internal/cli/autostart.go`（阶段 C） | `internal/cli/autostart_cli.go` | 沿用显式启停后查询系统真实记录的流程，适配本项目输出与错误码 |
 | `internal/relay/models.go`、命名空间检查（阶段 D） | `internal/gateway/codex_backend.go` 的 `codexModelsWait`、`codexModels`、`codexBackend`；`internal/codexcat/codexcat.go` 的 `CacheEntries` | 精简提取三秒预算、目录缓存回退与未知前缀拒绝，保留原始 JSON、只读/有界缓存、401/403 和会话权限边界 |
@@ -28,6 +29,29 @@
 
 Magpie 的配置适配器与网关不是直接整包复制的目标：它们还包含账户、路由组、
 后台守护进程和自动重启等本项目暂不需要的功能。只提取当前配置切换所需部分。
+
+## Codex 官方订阅与 CPA
+
+主场景为 CPA 持有官方 OAuth/订阅，QCS 配置直连和模型目录。客户端本机没有官方
+登录，也能选择 GPT 模型与 Fast；不要把自定义 provider 状态等同于上游不再使用
+官方订阅。实际官方 Codex 0.159.2 的无登录目录、临时 thread/turn、priority 请求
+及还原证据见 [CODEX_SUBSCRIPTION.md](CODEX_SUBSCRIPTION.md)。本地假 SSE 不替代
+真实 Desktop/CPA/订阅验收。
+
+- Magpie 的 [`codexAccount`](https://github.com/yetone/magpie/blob/7660399a121af67db4efd56ecb6bd4fb04dc53f1/internal/provider/account.go#L1012)
+  与 [`codexSign`](https://github.com/yetone/magpie/blob/7660399a121af67db4efd56ecb6bd4fb04dc53f1/internal/provider/codex_request.go#L31)
+  将官方订阅作为 provider，用 OAuth 签名请求 ChatGPT backend。本项目不复制账户池、
+  令牌刷新或订阅网关，将上游职责留在 CPA。
+- Magpie 的 `CodexCatalog`/`Entries` 为自定义 provider 提供完整官方模型条目与
+  `service_tiers`。本项目保留该设计；修复纯原生 GPT 列表未绑定目录时显示过多模型、
+  拉取结果的默认名称覆盖官方显示名的问题。
+- Magpie 的 [`addLogin`](https://github.com/yetone/magpie/blob/7660399a121af67db4efd56ecb6bd4fb04dc53f1/internal/provider/signin.go#L983)
+  在客户端尚未登录时还会写入真实 Codex 认证存储。它与本项目只改配置、不写登录文件
+  的范围不同；不能以“只在 Magpie 登录”推断本机没有官方登录，也不为兼容 API provider
+  构造虚假官方认证。
+- Magpie 的 `putProvider` 所写 actor header 用于 OpenAI 工具能力，独立于模型列表和
+  Fast；本轮不自动移植。CPA 的工具协议、实例开关及实际调用需独立验证，不给所有
+  provider 增加共享默认头。来源与 CPA 固定版本证据见 CODEX_SUBSCRIPTION.md。
 
 ## 路由相关参考边界
 

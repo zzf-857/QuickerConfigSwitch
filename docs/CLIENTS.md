@@ -7,8 +7,8 @@
 
 | 客户端 | qcs ID | 配置与模式 | 登录边界 |
 | --- | --- | --- | --- |
-| Codex CLI | `codex` | `CODEX_HOME/config.toml`，默认 `~/.codex/config.toml`；直连或本地路由 | 直连保留登录文件；路由保留内置官方 provider 和活动登录 |
-| ChatGPT/Codex Desktop | `codex` | 与 Codex CLI 共用配置，不重复建立第二份配置 | 同上，改配置后需退出桌面端和仍在运行的共享 app-server |
+| Codex CLI | `codex` | `CODEX_HOME/config.toml`，默认 `~/.codex/config.toml`；优先使用单一 provider 直连，可选本地路由 | CPA 持有订阅 OAuth 时，直连只需 CPA 访问密钥；本机无需 ChatGPT 登录。已有登录文件保留 |
+| ChatGPT/Codex Desktop | `codex` | 与 Codex CLI 共用配置，不重复建立第二份配置 | 同上；本机账号界面和会话历史按 provider 隔离是另一项边界，改配置后需退出桌面端及共享 app-server |
 | Claude Code CLI | `claude` | `CLAUDE_CONFIG_DIR/settings.json`，默认 `~/.claude/settings.json`；单一 provider 直连 | 不改官方登录文件，切回原配置后恢复使用；直连要求明确的第三方认证 |
 | Claude Desktop | `claude-desktop` | 原目录与 `Claude-3p` 的部署模式、独立 gateway profile；支持 Code/Cowork 的 3p 配置 | 保留原登录数据，3p 期间使用独立数据目录，不使用官方 Anthropic 登录 |
 
@@ -16,6 +16,49 @@ Magpie 的 `desktopapp.go` 区分两个同名 `ChatGPT.app`：Codex 桌面端标
 `com.openai.codex`，独立聊天应用标识为 `com.openai.chat`。仅根据名称判断会误识别。
 Windows 对应 Codex 的 `OpenAI.Codex` Store 主包。这里的 `codex` 支持前者；
 没有给独立聊天应用虚构第三方模型配置接口。
+
+## Codex：CPA 管理订阅，客户端直连
+
+主场景是 **CPA 持有官方订阅 OAuth，Codex 通过 CPA 访问密钥直连**：
+
+```text
+Codex CLI / Codex Desktop → CPA Responses 接口 → CPA 中已登录的官方订阅
+```
+
+```sh
+qcs provider add cpa --template cpa --key '<CPA访问密钥>'
+qcs provider models cpa --fetch
+qcs use codex cpa/gpt-5.5
+# 如需明确开启 Fast：qcs use codex cpa/gpt-5.5 --fast
+```
+
+QCS 只配置 CPA 的地址、访问密钥和模型；订阅 OAuth 由 CPA 管理。切换命令退出后，
+Codex 直接访问运行中的 CPA，无需 QCS 常驻转发。本机可以从未登录 ChatGPT，
+`auth.json` 不存在时仍保持不存在；已有登录文件也不改动。
+
+发给上游的模型 ID 保持原样，例如 `gpt-5.5`。已知 GPT 模型复用 Codex 本身的模型
+元数据，保留 `GPT-5.5` 原生显示名、推理档位和 Fast 选项；拉取列表默认返回的
+`name == id` 不会覆盖原生显示名。显式提供的自定义显示名仍保留。未知模型使用
+兼容目录条目，不能把它当成官方模型能力已经核实。
+
+拉取 CPA 模型列表后，选择器按这份明确列表生成目录：CPA 只提供 `gpt-5.5` 时，
+只展示该模型，不额外混入 Codex 的其它内置模型。未拉取列表时没有这份上游可用性
+依据，仍可直接选择精确模型 ID，模型实际可用性由 CPA 决定。
+
+Fast 有两项独立证据：客户端目录保留 Fast 档位，以及实际 Responses 请求发送
+`service_tier: "priority"`。CPA 及其上游账号是否接受该档位、实际速度或计费如何，
+需要对真实 CPA 验收，不能从目录或本地假响应推断。
+
+**本机官方账号体验是独立边界。** 自定义 provider 下，桌面端可能显示 API 模式，
+会话列表也按 provider 隔离；这不表示 GPT 原名、推理档位或 Fast 必须依赖本机登录。
+切回官方后恢复原配置及其原有登录使用方式；保留的 provider 定义用于打开其历史会话，
+qcs 写入的密钥仍按所有权记录撤销。
+
+只有另需保留**本机活动官方 provider / 登录态**，并让本机官方模型与 CPA 模型并存时，
+才选择可选的模式 R。本机 Codex 经常驻 QCS 路由分流；`--relay-all` 把模型请求都发到
+CPA，其它官方路径仍使用本机官方配置。此模式的本机认证、目录请求和额度限制见
+[REQUIREMENTS.md](REQUIREMENTS.md)，不能套用到上面的无本机登录直连场景。
+两种凭据归属与操作说明见 [CODEX_SUBSCRIPTION.md](CODEX_SUBSCRIPTION.md)。
 
 ## Claude CLI 的单一配置行为
 
@@ -72,14 +115,20 @@ Windows 仍需验收用户目录继承的 ACL，不能用 Unix 权限测试替�
 
 ## 验证与边界
 
-- Codex 0.159.2：实际 app-server 严格加载临时配置及目录，检查 Fast 能力；重跑见
-  `scripts/check_codex_contract.py`。
+- Codex 0.159.2：官方 app-server 在临时配置中完成五项检查。原三项目录合同覆盖
+  新 provider、显式自定义模型、原自定义目录；新增两项覆盖**无本机登录**的新 provider
+  与从 CPA 假后端拉取的单一 GPT 列表。实际 `model/list` 保留原名、推理及 Fast，
+  明确列表只有上游提供的模型。两项无登录场景还完成 `thread/start`、`turn/start`
+  及 loopback 假 SSE：每项恰好一条 `/v1/responses`，原始 `gpt-5.5`、`priority`、
+  仅 CPA bearer，无官方账号认证，始终没有 `auth.json`，切回恢复原配置。
+  重跑见 `scripts/check_codex_contract.py`；这验证真实客户端的配置与请求行为，
+  未验证真实 CPA 的 OAuth、远端推理或原生桌面交互。
 - Claude CLI 2.1.302：官方 npm 分发通过 SHA512 校验，在隔离配置与本地假后端检查
   精确模型 ID、第三方认证及官方 OAuth 隔离。未使用真实账号或远端模型。
 - 桌面适配以 Magpie/CC Switch 的已实现配置合同及临时文件回归为依据；Windows/macOS
   真实 Desktop、Cowork、登录和上游请求仍按 ACCEPTANCE.md 验收，不标成真机已通过。
-- 本轮最终 GTK3/`nogui` 各 20 个测试包、368 个顶层测试通过，19 项前端测试及真实
-  后端浏览器流程通过；Linux 桌面和 Windows GUI/macOS CLI 构建通过。条件跳过与分阶段
-  证据见 STAGES.md。
+- 全量回归、构建、浏览器流程及条件跳过的分阶段证据见 [STAGES.md](STAGES.md)。
+  历史阶段的计数不代替本轮最终运行结果。
 - 模型目录中保留 Fast 以及请求保留 `priority`，不证明 CPA 实际提供对应速度或计费。
-  官方订阅额度耗尽时的客户端发送限制仍见 REQUIREMENTS.md。
+  本机官方登录在模式 R 下的额度发送限制见 REQUIREMENTS.md；模式 D 的上游订阅
+  认证和额度由 CPA 管理，仍需真实部署确认。

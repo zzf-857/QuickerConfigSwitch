@@ -83,22 +83,22 @@ CC Switch 的 Codex 供应商同时保存 `auth`（即 `auth.json` 内容，第�
 
 ### 2.5 本项目给 Codex 的三种模式
 
-| | **O 官方** | **D 直连**（无常驻进程） | **R 保留订阅**（本地路由，可选模块） |
+| | **O 官方** | **D 直连**（CPA 代管订阅的主方式） | **R 本机官方登录**（本地路由，可选模块） |
 | --- | --- | --- | --- |
 | 写入的键 | 无（还原态） | `model_provider`、`model`、`[model_providers.qcs-<id>]`，需要时加 `model_catalog_json` | **只有** `openai_base_url = "http://127.0.0.1:<port>/backend-api/codex"` |
-| `auth.json` | 不碰 | 不碰（还在，但 D 期间不用） | 不碰，**照常使用** |
+| `auth.json` | 不碰 | 不碰，也不要求存在；订阅认证由 CPA 管理 | 不碰，**照常使用** |
 | ChatGPT 登录态（远程控制、云任务、Chrome 插件等） | 官方客户端决定 | 桌面端进入 API 状态 | 保持官方 provider 和认证方式；具体功能待真机验收 |
 | 历史会话可见 | 官方 provider 的会话 | 只见 `qcs-<id>` 的会话 | 仍按官方 provider 列会话；旧直连会话仍有 provider 隔离 |
 | 官方模型 | ✅ | 走 CPA（"全走 CPA"） | 子模式「并存」：官方模型走 ChatGPT，自定义模型走 CPA；子模式「全走 CPA」：全部走 CPA |
-| Fast | ✅ | ✅：GPT 系列用内置目录；其它模型由我们生成 `model_catalog_json` 并带 `service_tiers` | ✅：官方模型用后端给的档位；自定义模型由路由生成的目录带档位 |
+| Fast | ✅ | ✅：明确模型列表总生成目录，GPT 整条复制原生元数据及 `service_tiers`；未列出模型时可沿用内置目录 | ✅：官方模型用后端给的档位；自定义模型由路由生成的目录带档位 |
 | 依赖 | 无 | 无 | 本地路由进程必须在跑（关闭时自动去掉 `openai_base_url`） |
 | 切回官方 | — | 删 `model_provider`/`model_catalog_json`，还原 `model`；**保留 provider 定义，撤销 qcs 写入的密钥**（旧线程要用） | 删 `openai_base_url`（若用户原来有，还原原值） |
 
-用户的两个诉求对应关系：
+用户的诉求对应关系：
 
-- "**继续保留官方订阅登录**" → D 和 R 都不碰 `auth.json`，切回即恢复；R 期间登录仍在使用。
-- "**全部模型请求走 CPA，但保留原始的 Fast**" → D 或 R「全走 CPA」保留档位；若还要活动官方登录，使用 R。CPA 需支持发来的模型与档位。
-- 保留官方 provider 下的会话与登录态，应使用 R；具体桌面功能仍需真机验收。目录和其它官方路径不属于「全部模型请求」。
+- "**所有订阅认证放 CPA，本机只配置地址，保留模型/Fast**" → 主方式 D，无需本机官方登录和 QCS 常驻路由。Magpie 的订阅账号在网关签名，客户端完整目录保留能力，具体链路见 CODEX_SUBSCRIPTION.md。
+- "**保留现有官方登录文件**" → D 和 R 都不碰 `auth.json`；存在的文件保留，不存在的不创建。
+- 若额外要保留本机官方 provider 下的会话与活动登录，可选择 R；具体桌面功能仍需真机验收。仅 R 的模型目录和其它官方路径仍走官方。
 
 > O、D、R 均已实现。实现状态和验收边界以 HANDOFF.md、REQUIREMENTS.md 为准。
 
@@ -236,7 +236,7 @@ type Target struct {
 | `model_provider = X` 和 `[model_providers.X]` 必须同时存在 | 否则 Codex 无法加载配置 |
 | 切走后保留 `[model_providers.qcs-*]` | 在它上面开的线程恢复时要用 |
 | 不动用户的 `service_tier`、`[features]`、`[desktop]`、`[profiles.*]`、`[mcp_servers.*]` | 用户自己的 Fast 选择与其它设置 |
-| 写 `model_catalog_json` 时必须带上所有想在选择器里看到的模型 | 显式目录会让 Codex 不再回退内置目录 |
+| 明确 provider 模型列表时总写目录，带上全部模型 | 显式目录替代内置列表，避免展示 CPA 未提供的模型；GPT 原名与完整原生元数据保留 |
 | 不碰 CC Switch 的 `custom` / `cc-switch-*` 表 | 共存，由用户自己决定 |
 | key 用 `experimental_bearer_token` 而不是 `env_key` | 从 Dock/开始菜单启动的桌面端拿不到 shell 环境变量 |
 | `wire_api = "responses"` | 当前 Codex 只支持 Responses |
@@ -247,7 +247,7 @@ type Target struct {
 ```toml
 model_provider = "qcs-cpa"
 model = "gpt-5.5"
-model_catalog_json = "/Users/me/Library/Application Support/QuickerConfigSwitch/codex/catalog-cpa.json"  # 仅当需要时
+model_catalog_json = "/Users/me/Library/Application Support/QuickerConfigSwitch/codex/catalog-cpa.json"  # 已有明确模型列表时
 
 [model_providers.qcs-cpa]
 name = "CPA 本地"
@@ -272,7 +272,7 @@ openai_base_url = "http://127.0.0.1:17321/backend-api/codex"
    - 去掉日期后缀能对上官方条目 → 复制它的 `service_tiers`；
    - 其它模型 → 生成通用条目（Codex 通用提示词、`shell_type=unified_exec`、`apply_patch=freeform`、`supports_search_tool` 等必填字段），`fast: true` 时加 `{"id":"priority","name":"Fast","description":"..."}`。
 3. 写文件时保留用户手工加在条目上的字段（magpie `codexcat.Keep` 的做法）。
-4. 只有当"所选模型都在 Codex 内置目录里"时才可以不写目录文件；默认写，以便选择器里列出该 provider 的全部模型。
+4. provider 有明确模型列表时总写完整目录，即使全是原生 GPT。只有未列出模型、所选模型可完全沿用内置能力且没有原自定义目录时，才可省略生成目录。`/models` 拉取的 `Name == ID` 是占位名，不覆盖 GPT 官方显示名；其它显式名称仍生效。
 
 ### 4.7 Claude Code 适配器
 

@@ -46,7 +46,7 @@ var bundled []byte
 // Model is one model to offer Codex.
 type Model struct {
 	Slug    string   // id sent to the provider, e.g. "gpt-5.5"
-	Name    string   // display name; Slug when empty
+	Name    string   // display name; empty/Slug preserves a native label
 	Efforts []string // reasoning levels, may be empty
 	Fast    bool     // offer Fast (service tier "priority")
 	Context int      // context window, 0 = unknown
@@ -187,7 +187,7 @@ func asAnyTiers(ts ...tier) []any {
 // Catalog renders a whole models.json ({"models":[...]}) for models, ranked
 // in the given order.
 //   - Same slug as an own entry (see OwnEntries): that entry copied, with
-//     display_name (when Name is set), priority and visibility "list" set,
+//     display_name (when Name is set and differs from Slug), priority and visibility "list" set,
 //     start-up notice and upgrade prompt removed, and context_window set when
 //     Context is known. Fast=false strips its service tiers; Fast=true on an
 //     entry with none adds Fast.
@@ -264,7 +264,10 @@ func copyOwn(raw map[string]any, m Model, name string, prio int) map[string]any 
 	delete(e, "availability_nux")
 	delete(e, "upgrade")
 	e["slug"], e["priority"], e["visibility"] = m.Slug, prio, "list"
-	if m.Name != "" {
+	// Fetching /models uses the ID as its default name. That placeholder
+	// must not replace Codex's own display name (e.g. "GPT-5.5"). Explicit
+	// custom labels and a missing native display name still get a value.
+	if label, _ := e["display_name"].(string); m.Name != "" && m.Name != m.Slug || label == "" {
 		e["display_name"] = name
 	}
 	if s, _ := e["base_instructions"].(string); s == "" {

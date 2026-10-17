@@ -5,8 +5,8 @@
 测试计数只描述对应阶段的检查，不当作后续阶段的固定基线。
 
 已提交的阶段入口：A `96f94d4`，B `3865bec`，C `1ca7516`，D `f67c90c`。
-阶段 E 为 `6893f29`，F 为 `9a5a6ff`，G 为 `3d3c17b`。阶段 H 随本记录提交，
-最终 SHA 用 `git log --oneline` 查看。
+阶段 E 为 `6893f29`，F 为 `9a5a6ff`，G 为 `3d3c17b`，H 为 `e5f55eb`。
+阶段 I 随本记录提交，最终 SHA 用 `git log --oneline` 查看。
 远端交接目标为 `origin/claude/exciting-galileo-cgd4uk`，
 提交与远端状态分别以 Git 历史、远端引用为准。
 
@@ -129,9 +129,32 @@
 - 客户端支持/登录边界、真实桌面待验收与已知元数据数组/空目录边界见 CLIENTS.md、
   ACCEPTANCE.md；实现与来源见 UPSTREAM.md。真机行为不以夹具或交叉编译替代。
 
+## 阶段 I：CPA 代管官方订阅与无本机登录的 Codex/Fast（已完成）
+
+- 重新追踪固定 Magpie 提交的 `codexAccount`、`codexSign`、`codexBody`、
+  `CodexCatalog` 及客户端双路径配置。纠正此前把本机 ChatGPT 登录与模型/Fast 混为
+  一谈的推荐：用户主场景是 CPA 管理订阅、QCS 只配置直连，不要求本机登录或 QCS 路由。
+- 修复明确 CPA 模型列表全是内置 GPT 时没有生成目录的问题：此前 CPA 只提供
+  GPT-5.5，真实客户端仍列八个内置模型；现在只列 CPA 的明确列表，并保留完整原生条目。
+- `/models` 拉取结果以 ID 充当默认名称时，不再覆盖 GPT 官方显示名；明确自定义名称、
+  Fast=false、原有档位/推理/功能开关及原子还原规则继续保留。
+- 官方 Codex CLI 0.159.2 的永久合同脚本从三例扩为五例。新增两例全程无 `auth.json`，
+  实际 model/list 保留 GPT 原名、low/medium/high/xhigh 与 Fast；实际 thread/turn
+  由本地假 SSE 完成，每例恰好一个 Responses 请求，原 ID、`priority`、仅 CPA bearer。
+  恢复原配置并撤销 CPA key，始终不创建本机登录。
+- 最终验证：GTK3/`nogui` 全量 race 各 20 个测试包、370 个顶层测试通过，2 项条件
+  跳过（当前用户无第二用户组、文件锁子进程 helper）。两种 vet、19 项前端测试、
+  依赖校验、Linux CLI/GTK3、Windows amd64 GUI、macOS arm64 CLI 构建通过。
+  最终 CLI 构建的五项官方 Codex 合同全部通过；真实后端 Chromium 检查直连提示及
+  路由模式切换，并回归 Claude Desktop 取消/确认/私有文件/还原，无浏览器脚本错误。
+- 新增 CODEX_SUBSCRIPTION.md，固定上游函数链接，更新 README、架构、四端说明、
+  核心要求、交接与验收。OpenAI actor 工具能力作为独立待验项目，不宣称与 Fast 等同。
+  本地假 SSE 不证明真实 CPA OAuth、订阅档位/提速或 Codex Desktop 完整体验。
+
 ## 后续验收与优化
 
-- 三平台真实 Codex/CPA 切换、Fast、HTTP 回退、托盘面板和登录自启。
+- 优先验收真实 CPA 持有订阅、本机无登录的 Codex Desktop 直连模型/Fast；再按需验收
+  本机官方登录路由、HTTP 回退、三平台托盘面板和登录自启。
 - GUI 方案编辑和 provider 连接测试；之后再评估系统钥匙串、会话迁移和新 Agent。
 - 真机或凭据不可用时记录具体未验证项，继续独立工作，不把它们标成通过。
 - 具体验收步骤与当前平台证据见 [ACCEPTANCE.md](ACCEPTANCE.md)。后续优先查阅

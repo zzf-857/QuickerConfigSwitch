@@ -193,3 +193,7 @@ func noCR(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	return strings.TrimSuffix(s, "\r")
 }
+
+// TOMLLiteral is v spelled as a TOML value, as the setters here write it:
+// a string quoted, an Inline table inline, a Raw as it is.
+func TOMLLiteral(v any) string { return tomlLiteral(v) }

@@ -1,0 +1,3 @@
+internal/edit, internal/filememo and internal/steady are adapted from
+yetone/magpie (https://github.com/yetone/magpie), MIT License,
+Copyright (c) yetone and magpie contributors.
